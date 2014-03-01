@@ -328,7 +328,7 @@ def SearchDataBMP(volume):
         return status, error
 
 
-def ReadDataJPG(volume):
+#def ReadDataJPG(volume):
 
 
 def signal_handler(signal, frame):
@@ -368,21 +368,17 @@ signal.signal(signal.SIGINT, signal_handler)
 
 
 def main(argv):
-    #try:
-    global debug
+    try:
+        global debug
         global MD5HashValue
         #parse the command-line arguments
-        fragments = int(0)
-        write = False
-        status = True
-        error = ''
         parser = argparse.ArgumentParser(description="A FAT32 file system writer that forces fragmentation.",
                                          add_help=True)
-    parser.add_argument('-p', '--path', help='The path to write the files to.', required=True)
-    parser.add_argument('-v', '--volume', help='The volume to read from.', required=True)
-    parser.add_argument('-d', '--debug', help='The level of debugging.', required=False)
-    parser.add_argument('-s', '--search', help='Search for JPG/BMP.', action='store_true', required=True)
-    parser.add_argument('--version', action='version', version='%(prog)s 1.5')
+        parser.add_argument('-p', '--path', help='The path to write the files to.', required=True)
+        parser.add_argument('-v', '--volume', help='The volume to read from.', required=True)
+        parser.add_argument('-d', '--debug', help='The level of debugging.', required=False)
+        parser.add_argument('-s', '--search', help='Search for JPG/BMP.', action='store_true', required=True)
+        parser.add_argument('--version', action='version', version='%(prog)s 1.5')
         args = parser.parse_args()
         if (args.volume):
             volume = args.volume
@@ -409,36 +405,36 @@ def main(argv):
 
 
         #=======================================================================================================================
-    Header()
-    status, error = ReadBootSector(volume)
+        Header()
+        status, error = ReadBootSector(volume)
         if (status):
             print('| + Reading Boot Sector.                                                 |')
         else:
             print('| - Reading Boot Sector.                                                 |')
             Failed(error)
-    if (search):
-        status, error = SearchDataJPG(volume)
-        if (status):
+        if (search):
+            status, error = SearchDataJPG(volume)
+            if (status):
                 print('| + Searching Data.                                                      |')
             else:
                 print('| - Searching Data.                                                      |')
                 Failed(error)
-    if (search):
-        status, error = SearchDataBMP(volume)
-        if (status):
-            print('| + Searching Data.                                                      |')
-        else:
-            print('| - Searching Data.                                                      |')
-            Failed(error)
-            #status, error = WriteDatatoFile(file, FileData)
-            #if (status):
-            #print('| + Writing File.                                                        |')
-            #else:
-            #print('| - Writing File.                                                        |')
-            #Failed(error)
-        Completed()
-        #except:
-        #    print()
+        if (search):
+            status, error = SearchDataBMP(volume)
+            if (status):
+                print('| + Searching Data.                                                      |')
+            else:
+                print('| - Searching Data.                                                      |')
+                Failed(error)
+                #status, error = WriteDatatoFile(file, FileData)
+                #if (status):
+                #print('| + Writing File.                                                        |')
+                #else:
+                #print('| - Writing File.                                                        |')
+                #Failed(error)
+            Completed()
+    except:
+        print()
 
 
 main(sys.argv[1:])
