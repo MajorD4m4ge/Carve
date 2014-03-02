@@ -9,7 +9,7 @@ import datetime
 import signal
 import struct
 import hashlib
-from array import array
+import subprocess
 from sys import platform as _platform
 import ntpath
 
@@ -49,10 +49,14 @@ ValidBytesPerSector = [512, 1024, 2048, 4096]
 
 MD5HashValue = ''
 
-JPGHeader = 0xFFD8
-JPGFooter = 0xFFD9
-BMPHeader = 0x4D42
-
+JPGHeader = ['JPG Header', 0xFFD8FFE0, 4]
+JPGFooter = ['JPG Footer', 0xFFD9FFE0, 4]
+BMPHeader = ['BMP Header', 0x4D42, 2]
+PNGHeader = ['PNG Header', 0x89504E470D0A1A0A, 8]
+PNGFooter = ['PNG Footer', 0x49454E44AE426082, 8]
+GIFHeader1 = ['GIF Header', 0x474946383961, 6]
+GIFHeader2 = ['GIF Header', 0x474946383761, 6]
+GIFFooter = ['GIF Header', 0x3b]
 StartOffset = ''
 EndOffset = ''
 
@@ -151,6 +155,22 @@ def ReadBootSector(volume):
         error = 'Cannot read Boot Sector.'
     finally:
         return status, error
+
+
+def DriveLetter(drive):
+    status = True
+    error = ''
+
+    try:
+        if os.name == 'posix':
+            driveletter = ('/dev/' + drive)
+        elif os.name == 'nt':
+            driveletter = ('\\.\%s:' % drive)
+    except:
+        status = False
+        error = 'Cannot convert Drive Letter.'
+    finally:
+        return status, error, driveletter
 
 
 def find_missing_range(numbers, min, max):
@@ -266,7 +286,7 @@ def WriteDatatoFile(file, filedata):
         return status, error
 
 
-def SearchDataJPG(volume):
+def SearchData(volume, type):
     status = True
     error = ''
 
@@ -283,9 +303,14 @@ def SearchDataJPG(volume):
             while (True):
                 f.seek(BytesPerSector * FirstDataSector + x)
                 bytes = f.read(16)  #Size of FAT32 Directory
-                firstchar = struct.unpack("H", bytes[0:2])[0]
-                if (firstchar == 0xFFD8):
-                    print('JPG Header Found at Offset: ' + str(BytesPerSector * FirstDataSector + x))
+                if (type[2] == 2):
+                    firstchar = struct.unpack("H", bytes[0:2])[0]
+                if (type[2] == 4):
+                    firstchar = struct.unpack("I", bytes[0:4])[0]
+                if (type[2] == 8):
+                    firstchar = struct.unpack("Q", bytes[0:4])[0]
+                if (firstchar == type[1]):
+                    print('\t' + str(type[0]) + ' Found at Offset: ' + str(BytesPerSector * FirstDataSector + x))
                     break
                 else:
                     x += 16
@@ -296,36 +321,24 @@ def SearchDataJPG(volume):
         return status, error
 
 
-def SearchDataBMP(volume):
-    status = True
-    error = ''
-
-    try:
-        if (debug >= 1):
-            print('Entering SearchDataBMP:')
+def Search(volume, data):
+    with open(volume, "rb") as f:
         if (debug >= 2):
-            print('Volume Passed in: ' + str(volume))
-        readchunk = bytearray()
-        with open(volume, "rb") as f:
-            if (debug >= 2):
-                print('\tSeeking to First Data Sector [Bytes]: ' + str(BytesPerSector * FirstDataSector))
-            x = 0
-            while (True):
-                f.seek(BytesPerSector * FirstDataSector + x)
-                bytes = f.read(16)  #Size of FAT32 Directory
+            print('\tSeeking to First Data Sector [Bytes]: ' + str(BytesPerSector * FirstDataSector))
+        x = 0
+        while (True):
+            f.seek(BytesPerSector * FirstDataSector + x)
+            bytes = f.read(16)  #Size of FAT32 Directory
+
+            if (len(data[1]) == 2):
                 firstchar = struct.unpack("H", bytes[0:2])[0]
-                if (firstchar == 0x4D42):
-                    print('BMP Header Found at Offset: ' + str(BytesPerSector * FirstDataSector + x))
-                    break
-                else:
-                    x += 16
-
-
-    except:
-        error = 'Error: Cannot Find Valid Headers.'
-        status = False
-    finally:
-        return status, error
+            if (len(data[1]) == 4):
+                firstchar = struct.unpack("I", bytes[0:4])[0]
+            if (firstchar == data[1]):
+                print('\t' + str(data[0]) + ' Found at Offset: ' + str(BytesPerSector * FirstDataSector + x))
+                break
+            else:
+                x += 16
 
 
 #def ReadDataJPG(volume):
@@ -358,8 +371,6 @@ def Failed(error):
 def Completed():
     print('| Completed.                                                             |')
     print('+------------------------------------------------------------------------+')
-    #print('  File: ' + str(ntpath.basename(file)) + ' - ' + 'MD5: ' + str(MD5HashValue))
-    print('+------------------------------------------------------------------------+')
     sys.exit(0)
 
 
@@ -372,7 +383,7 @@ def main(argv):
         global debug
         global MD5HashValue
         #parse the command-line arguments
-        parser = argparse.ArgumentParser(description="A FAT32 file system writer that forces fragmentation.",
+        parser = argparse.ArgumentParser(description="A FAT32 file system carver.",
                                          add_help=True)
         parser.add_argument('-p', '--path', help='The path to write the files to.', required=True)
         parser.add_argument('-v', '--volume', help='The volume to read from.', required=True)
@@ -404,23 +415,24 @@ def main(argv):
 
 
 
-        #=======================================================================================================================
         Header()
+
         status, error = ReadBootSector(volume)
+
         if (status):
             print('| + Reading Boot Sector.                                                 |')
         else:
             print('| - Reading Boot Sector.                                                 |')
             Failed(error)
         if (search):
-            status, error = SearchDataJPG(volume)
+            status, error = SearchData(volume, BMPHeader)
             if (status):
                 print('| + Searching Data.                                                      |')
             else:
                 print('| - Searching Data.                                                      |')
                 Failed(error)
         if (search):
-            status, error = SearchDataBMP(volume)
+            status, error = SearchData(volume, BMPHeader)
             if (status):
                 print('| + Searching Data.                                                      |')
             else:
