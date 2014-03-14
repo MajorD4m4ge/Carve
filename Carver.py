@@ -286,7 +286,7 @@ def WriteDatatoFile(file, filedata):
         return status, error
 
 
-def SearchData(volume, type):
+def SearchDataJPG(volume):
     status = True
     error = ''
 
@@ -303,14 +303,10 @@ def SearchData(volume, type):
             while (True):
                 f.seek(BytesPerSector * FirstDataSector + x)
                 bytes = f.read(16)  #Size of FAT32 Directory
-                if (type[2] == 2):
-                    firstchar = struct.unpack("H", bytes[0:2])[0]
-                if (type[2] == 4):
-                    firstchar = struct.unpack("I", bytes[0:4])[0]
-                if (type[2] == 8):
-                    firstchar = struct.unpack("Q", bytes[0:4])[0]
-                if (firstchar == type[1]):
-                    print('\t' + str(type[0]) + ' Found at Offset: ' + str(BytesPerSector * FirstDataSector + x))
+                firstchar = struct.unpack(">H", bytes[0:2])[0]
+                print(firstchar)
+                if (firstchar == 0xFFD8):
+                    print('\tFound at JPG Offset: ' + str(BytesPerSector * FirstDataSector + x))
                     break
                 else:
                     x += 16
@@ -321,27 +317,6 @@ def SearchData(volume, type):
         return status, error
 
 
-def Search(volume, data):
-    with open(volume, "rb") as f:
-        if (debug >= 2):
-            print('\tSeeking to First Data Sector [Bytes]: ' + str(BytesPerSector * FirstDataSector))
-        x = 0
-        while (True):
-            f.seek(BytesPerSector * FirstDataSector + x)
-            bytes = f.read(16)  #Size of FAT32 Directory
-
-            if (len(data[1]) == 2):
-                firstchar = struct.unpack("H", bytes[0:2])[0]
-            if (len(data[1]) == 4):
-                firstchar = struct.unpack("I", bytes[0:4])[0]
-            if (firstchar == data[1]):
-                print('\t' + str(data[0]) + ' Found at Offset: ' + str(BytesPerSector * FirstDataSector + x))
-                break
-            else:
-                x += 16
-
-
-#def ReadDataJPG(volume):
 
 
 def signal_handler(signal, frame):
@@ -385,16 +360,13 @@ def main(argv):
         #parse the command-line arguments
         parser = argparse.ArgumentParser(description="A FAT32 file system carver.",
                                          add_help=True)
-        parser.add_argument('-p', '--path', help='The path to write the files to.', required=True)
+        parser.add_argument('-p', '--path', help='The path to write the files to.', required=False)
         parser.add_argument('-v', '--volume', help='The volume to read from.', required=True)
         parser.add_argument('-d', '--debug', help='The level of debugging.', required=False)
-        parser.add_argument('-s', '--search', help='Search for JPG/BMP.', action='store_true', required=True)
         parser.add_argument('--version', action='version', version='%(prog)s 1.5')
         args = parser.parse_args()
         if (args.volume):
             volume = args.volume
-        if (args.search):
-            search = args.search
         if (args.debug):
             debug = args.debug
             debug = int(debug)
@@ -424,27 +396,13 @@ def main(argv):
         else:
             print('| - Reading Boot Sector.                                                 |')
             Failed(error)
-        if (search):
-            status, error = SearchData(volume, BMPHeader)
-            if (status):
-                print('| + Searching Data.                                                      |')
-            else:
-                print('| - Searching Data.                                                      |')
-                Failed(error)
-        if (search):
-            status, error = SearchData(volume, BMPHeader)
-            if (status):
-                print('| + Searching Data.                                                      |')
-            else:
-                print('| - Searching Data.                                                      |')
-                Failed(error)
-                #status, error = WriteDatatoFile(file, FileData)
-                #if (status):
-                #print('| + Writing File.                                                        |')
-                #else:
-                #print('| - Writing File.                                                        |')
-                #Failed(error)
-            Completed()
+        status, error = SearchDataJPG(volume)
+        if (status):
+            print('| + Searching Data.                                                      |')
+        else:
+            print('| - Searching Data.                                                      |')
+            Failed(error)
+        Completed()
     except:
         print()
 
