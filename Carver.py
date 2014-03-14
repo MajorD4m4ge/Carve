@@ -295,7 +295,6 @@ def SearchDataJPG(volume):
             print('Entering SearchDataJPG:')
         if (debug >= 2):
             print('Volume Passed in: ' + str(volume))
-        readchunk = bytearray()
         with open(volume, "rb") as f:
             if (debug >= 2):
                 print('\tSeeking to First Data Sector [Bytes]: ' + str(BytesPerSector * FirstDataSector))
@@ -304,9 +303,8 @@ def SearchDataJPG(volume):
                 f.seek(BytesPerSector * FirstDataSector + x)
                 bytes = f.read(16)  #Size of FAT32 Directory
                 firstchar = struct.unpack(">H", bytes[0:2])[0]
-                print(firstchar)
                 if (firstchar == 0xFFD8):
-                    print('\tFound at JPG Offset: ' + str(BytesPerSector * FirstDataSector + x))
+                    print('\tFound JPG Header at Offset ' + str(BytesPerSector * FirstDataSector + x))
                     break
                 else:
                     x += 16
@@ -317,6 +315,91 @@ def SearchDataJPG(volume):
         return status, error
 
 
+def SearchDataBMP(volume):
+    status = True
+    error = ''
+
+    try:
+        if (debug >= 1):
+            print('Entering SearchDataBMP:')
+        if (debug >= 2):
+            print('Volume Passed in: ' + str(volume))
+        with open(volume, "rb") as f:
+            if (debug >= 2):
+                print('\tSeeking to First Data Sector [Bytes]: ' + str(BytesPerSector * FirstDataSector))
+            x = 0
+            while (True):
+                f.seek(BytesPerSector * FirstDataSector + x)
+                bytes = f.read(16)  #Size of FAT32 Directory
+                firstchar = struct.unpack(">H", bytes[0:2])[0]
+                if (firstchar == 0x424D):
+                    print('\tFFound BMP Header at Offset ' + str(BytesPerSector * FirstDataSector + x))
+                    break
+                else:
+                    x += 16
+    except:
+        error = 'Error: Cannot Find Valid Headers.'
+        status = False
+    finally:
+        return status, error
+
+
+def SearchDataGIF(volume):
+    status = True
+    error = ''
+
+    try:
+        if (debug >= 1):
+            print('Entering SearchDataGIF:')  #4198400
+        if (debug >= 2):
+            print('Volume Passed in: ' + str(volume))
+        with open(volume, "rb") as f:
+            if (debug >= 2):
+                print('\tSeeking to First Data Sector [Bytes]: ' + str(BytesPerSector * FirstDataSector))
+            x = 0
+            while (True):
+                f.seek(BytesPerSector * FirstDataSector + x)
+                bytes = f.read(16)  #Size of FAT32 Directory
+                firstchar = bytes[0:6]
+                if (firstchar == 0x474946383961):
+                    print('\tFound GIF Header at Offset: ' + str(BytesPerSector * FirstDataSector + x))
+                    break
+                else:
+                    x += 16
+    except:
+        error = 'Error: Cannot Find Valid Headers.'
+        status = False
+    finally:
+        return status, error
+
+
+def SearchDataPNG(volume):
+    status = True
+    error = ''
+
+    try:
+        if (debug >= 1):
+            print('Entering SearchDataPNG:')
+        if (debug >= 2):
+            print('Volume Passed in: ' + str(volume))
+        with open(volume, "rb") as f:
+            if (debug >= 2):
+                print('\tSeeking to First Data Sector [Bytes]: ' + str(BytesPerSector * FirstDataSector))
+            x = 0
+            while (True):
+                f.seek(BytesPerSector * FirstDataSector + x)
+                bytes = f.read(16)  #Size of FAT32 Directory
+                firstchar = struct.unpack(">Q", bytes[0:8])[0]
+                if (firstchar == 0x89504E470D0A1A0A):
+                    print('\tFound PNG Header at Offset: ' + str(BytesPerSector * FirstDataSector + x))
+                    break
+                else:
+                    x += 16
+    except:
+        error = 'Error: Cannot Find Valid Headers.'
+        status = False
+    finally:
+        return status, error
 
 
 def signal_handler(signal, frame):
@@ -397,6 +480,24 @@ def main(argv):
             print('| - Reading Boot Sector.                                                 |')
             Failed(error)
         status, error = SearchDataJPG(volume)
+        if (status):
+            print('| + Searching Data.                                                      |')
+        else:
+            print('| - Searching Data.                                                      |')
+            Failed(error)
+        status, error = SearchDataBMP(volume)
+        if (status):
+            print('| + Searching Data.                                                      |')
+        else:
+            print('| - Searching Data.                                                      |')
+            Failed(error)
+        status, error = SearchDataGIF(volume)
+        if (status):
+            print('| + Searching Data.                                                      |')
+        else:
+            print('| - Searching Data.                                                      |')
+            Failed(error)
+        status, error = SearchDataPNG(volume)
         if (status):
             print('| + Searching Data.                                                      |')
         else:
