@@ -1,7 +1,4 @@
-__author__ = 'khanta'
-
-#Create Disk  --> dd if=/dev/zero of=512MB.dd bs=1M count=512
-#Create FAT32 --> mkdosfs -n 512MB -F 32 -v 512MB.dd
+#Hash test --> md5 = hashlib.md5(data).hexdigest()
 import os
 import sys
 import argparse
@@ -57,6 +54,10 @@ PNGFooter = ['PNG Footer', 0x49454E44AE426082, 8]
 GIFHeader1 = ['GIF Header', 0x474946383961, 6]
 GIFHeader2 = ['GIF Header', 0x474946383761, 6]
 GIFFooter = ['GIF Header', 0x3b]
+GIFHeadChunk = []
+PNGHeadChunk = []
+BMPChunk = []
+PNGFootChunk = []
 StartOffset = ''
 EndOffset = ''
 
@@ -74,6 +75,14 @@ BMPHeaderOffsets = []
 # </editor-fold>
 
 
+class NotValidBootSector(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
 def HashMD5(file, block_size=2 ** 20):
     if (debug >= 1):
         print('Entering HashMD5:')
@@ -85,6 +94,28 @@ def HashMD5(file, block_size=2 ** 20):
                 break
             md5.update(data)
     return md5.hexdigest()
+
+
+def IdentifyFileSystem(volume):
+    status = True
+    error = ''
+    global BootSectorSize
+    global ValidBytesPerSector
+
+    try:
+        if (debug >= 1):
+            Writer('Entering ReadBootSector:')
+        with open(volume, "rb") as f:
+            bytes = f.read(BootSectorSize)
+            BytesPerSector = struct.unpack("<H", bytes[11:13])[0]
+            if (BytesPerSector not in ValidBytesPerSector):
+                raise NotValidBootSector('Only FAT32 supported.')
+
+    except:
+        status = False
+        error = 'Cannot read Boot Sector.'
+    finally:
+        return status, error
 
 
 def ReadBootSector(volume):
@@ -297,163 +328,179 @@ def WriteDatatoFile(file, filedata):
         return status, error
 
 
-def SearchJPGHeader(volume):
-    status = True
-    error = ''
-    global JPGHeaderOffsets
-    global BytesPerSector
-    global FirstDataSector
-
-    try:
-        if (debug >= 1):
-            print('Entering SearchJPGHeader:')
-        if (debug >= 2):
-            print('Volume Passed in: ' + str(volume))
-        with open(volume, "rb") as f:
-            if (debug >= 2):
-                print('\tSeeking to First Data Sector [Bytes]: ' + str(BytesPerSector * FirstDataSector))
-            f.seek(BytesPerSector * FirstDataSector)
-            bytes = f.read(16)
-            while (bytes != ''):
-                firstchar = struct.unpack(">H", bytes[0:2])[0]
-                if (firstchar == 0xFFD8):
-                    if (debug >=2):
-                        print('\tFound JPG Header at Offset ' + str(BytesPerSector * FirstDataSector))
-                        print('\tAdding JPG Header offset ' + str(BytesPerSector * FirstDataSector) + ' to list.')
-                    JPGHeaderOffsets.append(BytesPerSector * FirstDataSector)
-                bytes = f.read(16)
-    except:
-        error = 'Error: Cannot Find Valid Headers.'
-        sys.exit(1)
-        status = False
-    finally:
-        return status, error
-
-
-def SearchJPGFooter(volume):
-    status = True
-    error = ''
-    global JPGFooterOffsets
-    global BytesPerSector
-    global FirstDataSector
-
-    try:
-        if (debug >= 1):
-            print('Entering SearchJPGFooter:')
-        if (debug >= 2):
-            print('Volume Passed in: ' + str(volume))
-        with open(volume, "rb") as f:
-            if (debug >= 2):
-                print('\tSeeking to First Data Sector [Bytes]: ' + str(BytesPerSector * FirstDataSector))
-            f.seek(BytesPerSector * FirstDataSector)
-            bytes = f.read(16)
-            while (bytes != ''):
-                firstchar = struct.unpack(">H", bytes[0:2])[0]
-                if (firstchar == 0xFFD8):
-                    if (debug >=2):
-                        print('\tFound JPG Footer at Offset ' + str(BytesPerSector * FirstDataSector))
-                        print('\tAdding JPG Footer offset ' + str(BytesPerSector * FirstDataSector) + ' to list.')
-                    JPGFooterOffsets.append(BytesPerSector * FirstDataSector)
-                bytes = f.read(16)
-    except:
-        error = 'Error: Cannot Find Valid Headers.'
-        sys.exit(1)
-        status = False
-    finally:
-        return status, error
-
-
-
-
-
 def SearchGIFHeader(volume):
     status = True
     error = ''
-    global GIFHeaderOffsets
     global BytesPerSector
     global FirstDataSector
+    global GIFHeadChunk
+    counter = 0
 
     try:
         if (debug >= 1):
             print('Entering SearchGIFHeader:')  #4198400
         if (debug >= 2):
-            print('Volume Passed in: ' + str(volume))
+            print('\tVolume Passed in: ' + str(volume))
         with open(volume, "rb") as f:
             if (debug >= 2):
                 print('\tSeeking to First Data Sector [Bytes]: ' + str(BytesPerSector * FirstDataSector))
             f.seek(BytesPerSector * FirstDataSector)
-            bytes = f.read(16)
+            bytes = f.read(BytesPerSector)
+
             while (bytes != ''):
-                firstchar = bytes[0:6]
-                if (firstchar == b'GIF89a'):
-                    if (debug >=2):
-                        print('\tFound GIF Header at Offset ' + str(BytesPerSector * FirstDataSector))
-                        print('\tAdding GIF Header offset ' + str(BytesPerSector * FirstDataSector) + ' to list.')
-                    GIFHeaderOffsets.append(BytesPerSector * FirstDataSector)
-                bytes = f.read(16)
-    except:
-        error = 'Error: Cannot Find Valid Headers.'
-        status = False
-    finally:
-        return status, error
-
-
-def SearchGIFFooter(volume):
-    status = True
-    error = ''
-    global GIFHeaderOffsets
-    global BytesPerSector
-    global FirstDataSector
-
-    try:
-        if (debug >= 1):
-            print('Entering SearchGIFFooter:')  #4198400
-        if (debug >= 2):
-            print('Volume Passed in: ' + str(volume))
-        with open(volume, "rb") as f:
-            if (debug >= 2):
-                print('\tSeeking to First Data Sector [Bytes]: ' + str(BytesPerSector * FirstDataSector))
-            f.seek(BytesPerSector * FirstDataSector)
-            bytes = f.read(1)
-            while (bytes != ''):
-                firstchar = bytes[0:1]
-                if (firstchar == 0x3b):
-                    print ('match')
-                    nextbyte = f.read(2)
-                    if (nextbyte == 0x0000):
-                        if (debug >=2):
-                            print('\tFound GIF Footer at Offset ' + str(BytesPerSector * FirstDataSector))
-                            print('\tAdding GIF Footer offset ' + str(BytesPerSector * FirstDataSector) + ' to list.')
-                        GIFHeaderOffsets.append(BytesPerSector * FirstDataSector)
-                bytes = f.read(1)
-    except:
-        error = 'Error: Cannot Find Valid Headers.'
-        status = False
-    finally:
-        return status, error
-
-def SearchDataPNG(volume):
-    status = True
-    error = ''
-
-    try:
-        if (debug >= 1):
-            print('Entering SearchDataPNG:')
-        if (debug >= 2):
-            print('Volume Passed in: ' + str(volume))
-        with open(volume, "rb") as f:
-            if (debug >= 2):
-                print('\tSeeking to First Data Sector [Bytes]: ' + str(BytesPerSector * FirstDataSector))
-            x = 0
-            while (True):
-                f.seek(BytesPerSector * FirstDataSector + x)
-                bytes = f.read(16)  #Size of FAT32 Directory
-                firstchar = struct.unpack(">Q", bytes[0:8])[0]
-                if (firstchar == 0x89504E470D0A1A0A):
-                    print('\tFound PNG Header at Offset: ' + str(BytesPerSector * FirstDataSector + x))
+                firstchars = bytes[0:6]
+                if (firstchars == b'GIF89a'):
+                    if (debug >= 2):
+                        print('GIF Header found at offset: ' + str((BytesPerSector * FirstDataSector) + counter))
+                    GIFHeadChunk.append(bytes)
+                    bytes = f.read(BytesPerSector)
+                    while (struct.unpack(">Q", bytes[0:8])[0] != 0x89504E470D0A1A0A) and (
+                        struct.unpack(">H", bytes[0:2])[0] != 0xFFD9) and (
+                        struct.unpack(">H", bytes[0:2])[0] != 0x424D):  #Not JPG Start, Not PNG Start, Not BMP Start
+                        GIFHeadChunk.append(bytes)
+                        bytes = f.read(BytesPerSector)
+                    if (debug >= 2):
+                        print('\tAlternate header found.')
                     break
                 else:
-                    x += 16
+                    bytes = f.read(BytesPerSector)
+                    counter += 512
+            if (debug >= 2):
+                print('\tGIF First Chunk: ' + str(GIFHeadChunk))
+    except:
+        error = 'Error: Cannot Find Valid Headers.'
+        status = False
+    finally:
+        return status, error
+
+
+def SearchPNGHeader(volume):
+    status = True
+    error = ''
+    global BytesPerSector
+    global FirstDataSector
+    global PNGHeadChunk
+    counter = 0
+
+    try:
+        if (debug >= 1):
+            print('Entering SearchPNGHeader:')
+        if (debug >= 2):
+            print('\tVolume Passed in: ' + str(volume))
+        with open(volume, "rb") as f:
+            if (debug >= 2):
+                print('\tSeeking to First Data Sector [Bytes]: ' + str(BytesPerSector * FirstDataSector))
+            f.seek(BytesPerSector * FirstDataSector)
+            bytes = f.read(BytesPerSector)
+
+            while (bytes != ''):
+                firstchars = struct.unpack(">Q", bytes[0:8])[0]
+                if (firstchars == 0x89504E470D0A1A0A):
+                    if (debug >= 2):
+                        print('PNG Header found at offset: ' + str((BytesPerSector * FirstDataSector) + counter))
+                    PNGHeadChunk.append(bytes)
+                    bytes = f.read(BytesPerSector)
+                    while (bytes[0:6] != b'GIF89a') and (struct.unpack(">H", bytes[0:2])[0] != 0xFFD9) and (
+                        struct.unpack(">H", bytes[0:2])[0] != 0x424D):  #Not JPG Start, Not PNG Start, Not BMP Start
+                        PNGHeadChunk.append(bytes)
+                        bytes = f.read(BytesPerSector)
+                    if (debug >= 2):
+                        print('\tAlternate header found.')
+                    break
+                else:
+                    bytes = f.read(BytesPerSector)
+                    counter += 512
+            if (debug >= 2):
+                print('\tPNG First Chunk: ' + str(PNGHeadChunk))
+    except:
+        error = 'Error: Cannot Find Valid Headers.'
+        status = False
+    finally:
+        return status, error
+
+
+def SearchBMPHeader(volume):
+    status = True
+    error = ''
+    global BytesPerSector
+    global FirstDataSector
+    global BMPChunk
+    counter = 0
+
+    try:
+        if (debug >= 1):
+            print('Entering SearchBMPHeader:')
+        if (debug >= 2):
+            print('\tVolume Passed in: ' + str(volume))
+        with open(volume, "rb") as f:
+            if (debug >= 2):
+                print('\tSeeking to First Data Sector [Bytes]: ' + str(BytesPerSector * FirstDataSector))
+            f.seek(BytesPerSector * FirstDataSector)
+            bytes = f.read(BytesPerSector)
+
+            while (bytes != ''):
+                firstchars = struct.unpack(">H", bytes[0:2])[0]
+                if (firstchars == 0x424D):
+                    BMPFilesize = struct.unpack("<H", bytes[2:4])[0]
+                    if (debug >= 2):
+                        print('\tBMP Header found at offset: ' + str((BytesPerSector * FirstDataSector) + counter))
+                        print('\tBMP Filesize: ' + str(BMPFilesize))
+                    BMPChunk = bytes
+                    BMPChunk += f.read(BMPFilesize - 512)
+                    break
+                else:
+                    bytes = f.read(BytesPerSector)
+                    counter += 512
+            if (debug >= 2):
+                print('\tBMP First Chunk: ' + str(BMPChunk))
+    except:
+        error = 'Error: Cannot Find Valid Headers.'
+        status = False
+    finally:
+        return status, error
+
+
+def SearchPNGFooter(volume):
+    status = True
+    error = ''
+    global BytesPerSector
+    global FirstDataSector
+    global PNGFootChunk
+    counter = 0
+    bytes1 = b''
+    breader = 0
+
+    try:
+        if (debug >= 1):
+            print('Entering SearchPNGFooter:')
+        if (debug >= 2):
+            print('\tVolume Passed in: ' + str(volume))
+        with open(volume, "rb") as f:
+            if (debug >= 2):
+                print('\tSeeking to First Data Sector [Bytes]: ' + str(BytesPerSector * FirstDataSector))
+            f.seek(BytesPerSector * FirstDataSector)
+            bytes = f.read(BytesPerSector)
+
+            while (bytes != ''):
+                if (struct.unpack(">H", bytes[0:2])[
+                        0] == 0xFFD8):  # or (struct.unpack(">H", bytes[0:2])[0] == 0x424D) or (bytes[0:6] == b'GIF89a') or (struct.unpack(">Q", bytes[0:8])[0] == 0x89504E470D0A1A0A):
+                    tempoffset = BytesPerSector * FirstDataSector + counter
+                    if (debug >= 2):
+                        print('\tImage header found at: ' + str(tempoffset))
+                    while (bytes1 != 0x00000000000000000000000000000000):
+                        f.seek(tempoffset - breader)
+                        bytes1 = f.read(32)
+                        print(bytes1)
+                        if (b'IEND' in bytes1):  #0x49454E44AE426082
+                            print('Booya!')
+                            break
+                        else:
+                            breader += 32
+                else:
+                    bytes = f.read(BytesPerSector)
+                    counter += 512
+            if (debug >= 2):
+                print('\tPNG Last Chunk: ' + str(PNGFootChunk))
     except:
         error = 'Error: Cannot Find Valid Headers.'
         status = False
@@ -464,6 +511,10 @@ def SearchDataPNG(volume):
 def signal_handler(signal, frame):
     print('Ctrl+C pressed. Exiting.')
     sys.exit(0)
+
+
+def Writer(text):
+    print('\t' + text)
 
 
 def Header():
@@ -530,32 +581,42 @@ def main(argv):
 
 
         Header()
-
-        status, error = ReadBootSector(volume)
-
+    status, error = IdentifyFileSystem(volume)
+    if (status):
+        print('| [+] Identifying File System.                                             |')
+    else:
+        print('| [-] Unsupported File System.                                             |')
+        Failed(error)
+    status, error = ReadBootSector(volume)
         if (status):
-            print('| + Reading Boot Sector.                                                 |')
+            print('| [+] Reading Boot Sector.                                                 |')
         else:
-            print('| - Reading Boot Sector.                                                 |')
+            print('| [-] Reading Boot Sector.                                                 |')
             Failed(error)
-        status, error = SearchJPGHeader(volume)
-        if (status):
-            print('| + Searching for JPG Data.                                              |')
-        else:
-            print('| - Searching for JPG Data.                                              |')
-            Failed(error)
-        status, error = SearchJPGFooter(volume)
-        if (status):
-            print('| + Searching for BMP Data.                                              |')
-        else:
-            print('| - Searching for BMP Data.                                              |')
-            Failed(error)
-        status, error = SearchGIFHeader(volume)
-        if (status):
-            print('| + Searching for GIF Data.                                              |')
-        else:
-            print('| - Searching for GIF Data.                                              |')
-            Failed(error)
+    status, error = SearchGIFHeader(volume)
+    if (status):
+        print('| [+] Searching for GIF Data.                                              |')
+    else:
+        print('| [-] Searching for GIF Data.                                              |')
+        Failed(error)
+    status, error = SearchPNGHeader(volume)
+    if (status):
+        print('| [+] Searching for PNG Data.                                              |')
+    else:
+        print('| [-] Searching for PNG Data.                                              |')
+        Failed(error)
+    status, error = SearchBMPHeader(volume)
+    if (status):
+        print('| [+] Searching for BMP Data.                                              |')
+    else:
+        print('| [-] Searching for BMP Data.                                              |')
+        Failed(error)
+    status, error = SearchPNGFooter(volume)
+    if (status):
+        print('| [+] Searching for PNG Data.                                              |')
+    else:
+        print('| [-] Searching for PNG Data.                                              |')
+        Failed(error)
         Completed()
     #except:
         print()
