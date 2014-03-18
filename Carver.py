@@ -536,7 +536,7 @@ def SearchGIFFooter(volume):
             if (debug >= 2):
                 print('\tSeeking to First Data Sector [Bytes]: ' + str(GIFFootStart))
 
-            GIFFootChunk.append(f.read(GIFFootEnd - GIFFootStart))
+            GIFFootChunk.append(f.read(GIFFootEnd + 1 - GIFFootStart))
             GIFData = GIFHeadChunk + GIFFootChunk
             if (debug >= 2):
                 print('\tGIF First Chunk: ' + str(GIFHeadChunk))
