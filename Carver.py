@@ -55,6 +55,8 @@ GIFHeader1 = ['GIF Header', 0x474946383961, 6]
 GIFHeader2 = ['GIF Header', 0x474946383761, 6]
 GIFFooter = ['GIF Header', 0x3b]
 GIFHeadChunk = []
+GIFHeadChunk = []
+GIFData = []
 PNGHeadChunk = []
 BMPChunk = []
 PNGFootChunk = []
@@ -63,6 +65,8 @@ StartOffset = ''
 EndOffset = ''
 PNGFootStart = 0
 PNGFootEnd = 0
+GIFFootEnd = 0
+GIFFootStart = 0
 
 JPGHeaderOffsets = []
 JPGFooterOffsets = []
@@ -456,6 +460,84 @@ def SearchBMPHeader(volume):
                     counter += 512
             if (debug >= 2):
                 print('\tBMP First Chunk: ' + str(BMPChunk))
+                print('\tBMP MD5 Hash: ' + hashlib.md5(BMPChunk).hexdigest())
+    except:
+        error = 'Error: Cannot Find Valid Headers.'
+        status = False
+    finally:
+        return status, error
+
+
+def SearchGIFFooter(volume):
+    status = True
+    error = ''
+    global BytesPerSector
+    global FirstDataSector
+    global GIFFootChunk
+    global GIFHeadChunk
+    global GIFFootEnd
+    global GIFFootStart
+    global GIFData
+    counter = 0
+    breaker = False
+    backwards = 0
+
+    try:
+        if (debug >= 1):
+            print('Entering SearchGIFFooter:')
+        if (debug >= 2):
+            print('\tVolume Passed in: ' + str(volume))
+        with open(volume, "rb") as f:
+            if (debug >= 2):
+                print('\tSeeking to First Data Sector [Bytes]: ' + str(BytesPerSector * FirstDataSector))
+            f.seek(BytesPerSector * FirstDataSector)
+            bytes = f.read(BytesPerSector)
+            while (bytes != ''):
+                x = 512
+                while (x != 0):
+                    firstchars = struct.unpack("B", bytes[x - 1:x])[0]
+                    if (firstchars == 0x3B):
+                        print(firstchars)
+                        GIFFootEnd = (
+                        BytesPerSector * FirstDataSector + counter + x + 1)  #Data Offset + Number of Sectors + X offset + 8 for end of data
+                        if (debug >= 2):
+                            print('\tGIF Footer end located at offset [Bytes]: ' + str(GIFFootEnd))
+                        offsetfromsector = (x + 1)
+                        breaker = True
+                        break
+                    else:
+                        x -= 1
+                if (breaker):
+                    break
+                counter += 512
+                bytes = f.read(BytesPerSector)
+                print(BytesPerSector * FirstDataSector + counter)
+
+            while (True):
+                f.seek(GIFFootEnd - offsetfromsector - backwards - 16)
+                bytes = f.read(16)
+                if (bytes != b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'):
+                    backwards += 512
+                else:
+                    GIFFootStart = GIFFootEnd - offsetfromsector - backwards
+                    if (debug >= 2):
+                        print('\tPNG Footer start located at offset [Bytes]: ' + str(GIFFootStart))
+                    break
+
+            f.seek(GIFFootStart)
+            if (debug >= 2):
+                print('\tSeeking to First Data Sector [Bytes]: ' + str(GIFFootStart))
+            GIFFootChunk.append(f.read(GIFFootEnd - GIFFootStart))
+            GIFData = GIFHeadChunk + GIFFootChunk
+            if (debug >= 2):
+                print('\tBMP First Chunk: ' + str(GIFHeadChunk))
+                print('\tBMP Last Chunk: ' + str(GIFFootChunk))
+                print('\tBMP Chunk: ' + str(GIFData))
+                print('\tBMP MD5 Hash: ' + str(Hasher(GIFData)))
+
+
+
+
     except:
         error = 'Error: Cannot Find Valid Headers.'
         status = False
@@ -527,8 +609,7 @@ def SearchPNGFooter(volume):
                 print('\tPNG First Chunk: ' + str(PNGHeadChunk))
                 print('\tPNG Last Chunk: ' + str(PNGFootChunk))
                 print('\tPNG Chunk: ' + str(PNGData))
-
-            print(hashlib.md5(PNGData).hexdigest())
+                print('\tPNG MD5 Hash: ' + str(Hasher(PNGData)))
 
 
 
@@ -538,6 +619,14 @@ def SearchPNGFooter(volume):
         status = False
     finally:
         return status, error
+
+
+def Hasher(input):
+    ba = b''
+    for x in input:
+        ba += bytearray(x)
+
+    return hashlib.md5(ba).hexdigest()
 
 
 def signal_handler(signal, frame):
@@ -649,7 +738,13 @@ def main(argv):
         else:
             print('| [-] Searching for PNG Footer Data.                                       |')
             Failed(error)
-            Completed()
+        status, error = SearchGIFFooter(volume)
+        if (status):
+            print('| [+] Searching for GIF Footer Data.                                       |')
+        else:
+            print('| [-] Searching for GIF Footer Data.                                       |')
+            Failed(error)
+        Completed()
     except:
         print()
 
