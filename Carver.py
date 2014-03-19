@@ -235,6 +235,8 @@ def SearchGIFs(volume):
     slider = 0
     byte = b''
     data = []
+    gifs = []
+    endofgif = False
 
     if debug >= 1:
         print('Entering SearchGIFs:')
@@ -245,14 +247,33 @@ def SearchGIFs(volume):
             print('\tSeeking to First Data Sector [Bytes]: ' + str(BytesPerSector * FirstDataSector))
         f.seek(BytesPerSector * FirstDataSector)
         sector = f.read(BytesPerSector)
+        while sector != '':
         #Identify GIF Header
-        if sector[0:6] == b'GIF89a':
-            if debug >= 2:
-                print('\tGIF Header found at offset: ' + str((BytesPerSector * FirstDataSector) + counter))
-            #Check for contig GIF
-            while (byte != b'\x3b'):
-                byte = f.read()
-                data.append[byte]
+            if sector[0:6] == b'GIF89a':
+                if debug >= 3:
+                    print('\tGIF Header found at offset: ' + str((BytesPerSector * FirstDataSector) + counter))
+                #Check for contig GIF
+                while (slider != 512):
+
+                    if (struct.unpack(">Q", sector[0:8])[0] == 0x89504E470D0A1A0A) and (struct.unpack(">H", sector[0:2])[0] == 0xFFD8) and (struct.unpack(">H", sector[0:2])[0] == 0x424D):
+                        endofgif = False
+                        break
+                    else:
+                        byte = sector[slider:slider+1]
+                    if byte != b'\x3b':
+                        data.append(byte)
+                        slider += 1
+                    else:
+                        endofgif = True
+                        print (data)
+                        break
+            else:
+                sector = f.read(BytesPerSector)
+            if endofgif:
+                gifs.append(data)
+                break
+
+    sys.exit()
 
 
 def SearchGIFHeader(volume):
@@ -285,13 +306,8 @@ def SearchGIFHeader(volume):
                     byte = f.read(BytesPerSector)
                     while (struct.unpack(">Q", byte[0:8])[0] != 0x89504E470D0A1A0A) and (
                                 struct.unpack(">H", byte[0:2])[0] != 0xFFD8) and (
-                                struct.unpack(">H", byte[0:2])[
-                                    0] != 0x424D):  #Not JPG Start, Not PNG Start, Not BMP Start
-                        while (x != 512):
-                            if b'\x003b' != struct.unpack(">H", byte[x - 2:x])[0]:
-                                byte +=
+                                struct.unpack(">H", byte[0:2])[0] != 0x424D):  #Not JPG Start, Not PNG Start, Not BMP Start
                         GIFHeadChunk.append(byte)
-
                         byte = f.read(BytesPerSector)
                         if byte == '':
                             break
@@ -804,6 +820,7 @@ def main(argv):
         else:
             print('| [-] Reading Boot Sector.                                                 |')
             Failed(error)
+        SearchGIFs(volume)
         status, error = SearchGIFHeader(volume)
         if status:
             print('| [+] Searching for GIF Header Data.                                       |')
