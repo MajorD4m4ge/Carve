@@ -236,7 +236,8 @@ def SearchGIFs(volume):
     byte = b''
     data = []
     gifs = []
-    endofgif = False
+    endofgif = True
+    processing = False
 
     if debug >= 1:
         print('Entering SearchGIFs:')
@@ -250,28 +251,26 @@ def SearchGIFs(volume):
         while sector != '':
         #Identify GIF Header
             if sector[0:6] == b'GIF89a':
-                if debug >= 3:
+                if debug >= 2:
                     print('\tGIF Header found at offset: ' + str((BytesPerSector * FirstDataSector) + counter))
-                #Check for contig GIF
-                while (slider != 512):
-
+                data += sector
+                while byte != b'\x3b':
+                    sector = f.read(BytesPerSector)
                     if (struct.unpack(">Q", sector[0:8])[0] == 0x89504E470D0A1A0A) and (struct.unpack(">H", sector[0:2])[0] == 0xFFD8) and (struct.unpack(">H", sector[0:2])[0] == 0x424D):
                         endofgif = False
                         break
                     else:
-                        byte = sector[slider:slider+1]
-                    if byte != b'\x3b':
-                        data.append(byte)
-                        slider += 1
-                    else:
-                        endofgif = True
-                        print (data)
-                        break
+                        while (slider != 512):
+                            byte = sector[slider:slider + 1]
+                            data += byte
+                            print (byte)
+                print ('\tData' + str(data))
             else:
+                print('Offset: ' + str(BytesPerSector * FirstDataSector + counter))
                 sector = f.read(BytesPerSector)
-            if endofgif:
+                counter += 512
+        if endofgif:
                 gifs.append(data)
-                break
 
     sys.exit()
 
