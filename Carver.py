@@ -262,16 +262,21 @@ def SearchGIFs(volume):
                     else:
                         while (slider != 512):
                             byte = sector[slider:slider + 1]
-                            data += byte
-                            print (byte)
+                            if (byte != b'\x3b'):
+                                data += byte
+                            else:
+                                break
+                            slider += 1
+
                 print ('\tData' + str(data))
             else:
                 print('Offset: ' + str(BytesPerSector * FirstDataSector + counter))
                 sector = f.read(BytesPerSector)
                 counter += 512
+
         if endofgif:
                 gifs.append(data)
-
+    print ('\tData: ' + str(data))
     sys.exit()
 
 
@@ -772,8 +777,8 @@ signal.signal(signal.SIGINT, signal_handler)
 
 
 def main(argv):
-    try:
-        global debug
+    #try:
+    global debug
         #parse the command-line arguments
         parser = argparse.ArgumentParser(description="A FAT32 file system carver.",
                                          add_help=True)
@@ -871,8 +876,8 @@ def main(argv):
         Completed()
         FileHashes()
 
-    except:
-        print()
+    #except:
+    print()
 
 
 main(sys.argv[1:])
