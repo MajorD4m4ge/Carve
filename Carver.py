@@ -1,5 +1,9 @@
 #TODO Create list of images found to handle more than 1 image per type
 #TODO Create file creator that writes out files with counter, or maybe just hashes
+#0e63e6cc0426d87fd30d597a0a572a27,2d70374751335bcea8b6e3a8ced85a5fd2fe142e,png
+#34e4a705ab20b8c39b053cdd0d2e145e,f3ce8b3ead5836d054da50b149e83ea17ca1d4ee,jpg
+#2eeb5d2e239f35faa98b7ad119f4620c,ecb8ed802f44962c996a0888c03946d94141f7fa,gif
+#54c04b301ee28028369aaad0fa4ec1e7,38cdd190dedd25923a95b53a90f0270f1de8c463,bmp
 import sys
 import argparse
 import datetime
@@ -237,7 +241,12 @@ def SearchGIFs(volume):
     data = []
     gifs = []
     endofgif = True
-    processing = False
+    processing = True
+    altheader = False
+    backwards = 0
+    global GIFFootChunk
+    global GIFData
+    breaker = False
 
     if debug >= 1:
         print('Entering SearchGIFs:')
@@ -248,35 +257,105 @@ def SearchGIFs(volume):
             print('\tSeeking to First Data Sector [Bytes]: ' + str(BytesPerSector * FirstDataSector))
         f.seek(BytesPerSector * FirstDataSector)
         sector = f.read(BytesPerSector)
-        while sector != '':
-        #Identify GIF Header
+        while sector != b'':
+            #Identify GIF Header
             if sector[0:6] == b'GIF89a':
                 if debug >= 2:
-                    print('\tGIF Header found at offset: ' + str((BytesPerSector * FirstDataSector) + counter))
-                data += sector
-                while byte != b'\x3b':
+                    print('\tGIF Header found at offset [Bytes]: ' + str((BytesPerSector * FirstDataSector) + counter))
+                data.append(sector)
+                while byte != b'\x00\x3b':
                     sector = f.read(BytesPerSector)
-                    if (struct.unpack(">Q", sector[0:8])[0] == 0x89504E470D0A1A0A) and (struct.unpack(">H", sector[0:2])[0] == 0xFFD8) and (struct.unpack(">H", sector[0:2])[0] == 0x424D):
+                    counter += 512
+                    slider = 0
+                    if (struct.unpack(">Q", sector[0:8])[0] == 0x89504E470D0A1A0A) or (
+                        struct.unpack(">H", sector[0:2])[0] == 0xFFD8) or (
+                        struct.unpack(">H", sector[0:2])[0] == 0x424D):
                         endofgif = False
+                        altheader = True
+                        if debug >= 2:
+                            print('\tAlternate header found. Setting flag for 2nd piece search.')
                         break
                     else:
-                        while (slider != 512):
-                            byte = sector[slider:slider + 1]
-                            if (byte != b'\x3b'):
-                                data += byte
+                        while slider != 512:
+                            byte = sector[slider:slider + 2]
+                            if byte != b'\x00\x3b':
+                                if debug >= 3:
+                                    print('\tByte and offset: ' + str(
+                                        (BytesPerSector * FirstDataSector) + counter + slider) + ' : ' + str(byte))
+                                data.append(byte)
                             else:
+                                data.append(byte)
+                                endofgif = True
                                 break
-                            slider += 1
-
-                print ('\tData' + str(data))
+                            slider += 2
             else:
-                print('Offset: ' + str(BytesPerSector * FirstDataSector + counter))
+                if debug >= 3:
+                    print('\tSector offset [Bytes]: ' + str(BytesPerSector * FirstDataSector + counter))
+                    print('\tSector Data: ' + str(sector))
                 sector = f.read(BytesPerSector)
                 counter += 512
-
         if endofgif:
-                gifs.append(data)
-    print ('\tData: ' + str(data))
+            gifs.append(data)
+            if debug >= 2:
+                print('\tGIF MD5 Hash: ' + str(Hasher(data, 'md5')))
+        else:
+            counter = 0
+            f.seek(BytesPerSector * FirstDataSector)
+            byte = f.read(BytesPerSector)
+            while byte != '':
+                x = BytesPerSector
+                if (struct.unpack(">Q", byte[0:8])[0] != 0x89504E470D0A1A0A) and (
+                            struct.unpack(">H", byte[0:2])[0] != 0xFFD8) and (
+                            struct.unpack(">H", byte[0:2])[0] != 0x424D) and (byte[0:6] != b'GIF89a'):
+                    while x != 0:
+                        if byte[
+                           BytesPerSector - 16:BytesPerSector] == b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00':
+                            firstchars = struct.unpack(">H", byte[x - 2:x])[0]
+                            if firstchars == 0x003B:
+                                GIFFootEnd = (BytesPerSector * FirstDataSector + counter + x - 1)
+                                offsetfromsector = (x - 1)
+                                if debug >= 2:
+                                    print('\tGIF Footer end located at offset [Bytes]: ' + str(GIFFootEnd))
+                                    print('\tOffset from previous sector [Bytes]: ' + str(offsetfromsector))
+                                breaker = True
+                                break
+                            else:
+                                x -= 2
+                        else:
+                            break
+                    if breaker:
+                        break
+                    counter += BytesPerSector
+                    byte = f.read(BytesPerSector)
+                    if debug >= 3:
+                        print('\tNext sector: ' + str(BytesPerSector * FirstDataSector + counter))
+                else:
+                    counter += BytesPerSector
+                    byte = f.read(BytesPerSector)
+
+            while True:
+                f.seek(GIFFootEnd - offsetfromsector - backwards - 16)
+                byte = f.read(16)
+                if byte != b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00':
+                    backwards += BytesPerSector
+                else:
+                    GIFFootStart = GIFFootEnd - offsetfromsector - backwards
+                    if debug >= 2:
+                        print('\tGIF Footer start located at offset [Bytes]: ' + str(GIFFootStart))
+                    break
+            f.seek(GIFFootStart)
+            if debug >= 2:
+                print('\tSeeking to First Data Sector [Bytes]: ' + str(GIFFootStart))
+
+            GIFFootChunk.append(f.read(GIFFootEnd + 1 - GIFFootStart))
+            GIFData = data + GIFFootChunk
+            if debug >= 2:
+                print('\tGIF MD5 Hash: ' + str(Hasher(GIFData, 'md5')))
+            if debug >= 3:
+                print('\tGIF First Chunk: ' + str(data))
+                print('\tGIF Last Chunk: ' + str(GIFFootChunk))
+                print('\tGIF Chunk: ' + str(GIFData))
+
     sys.exit()
 
 
@@ -778,8 +857,8 @@ signal.signal(signal.SIGINT, signal_handler)
 
 def main(argv):
     #try:
-    global debug
-        #parse the command-line arguments
+        global debug
+    #parse the command-line arguments
         parser = argparse.ArgumentParser(description="A FAT32 file system carver.",
                                          add_help=True)
         parser.add_argument('-p', '--path', help='The path to write the files to.', required=True)
@@ -877,7 +956,7 @@ def main(argv):
         FileHashes()
 
     #except:
-    print()
+        print()
 
 
 main(sys.argv[1:])
