@@ -232,131 +232,6 @@ def WriteDatatoFile(path):
         return status, error
 
 
-def SearchGIF(volume):
-    status = True
-    error = ''
-    counter = 0
-    slider = 0
-    byte = b''
-    data = []
-    gifs = []
-    endofgif = True
-    processing = True
-    altheader = False
-    backwards = 0
-    global GIFFootChunk
-    global GIFData
-    breaker = False
-
-    if debug >= 1:
-        print('Entering SearchGIFs:')
-    if debug >= 2:
-        print('\tVolume Passed in: ' + str(volume))
-    with open(volume, "rb") as f:
-        if debug >= 2:
-            print('\tSeeking to First Data Sector [Bytes]: ' + str(BytesPerSector * FirstDataSector))
-        f.seek(BytesPerSector * FirstDataSector)
-        sector = f.read(BytesPerSector)
-        while sector != b'':
-            #Identify GIF Header
-            if sector[0:6] == b'GIF89a':
-                if debug >= 2:
-                    print('\tGIF Header found at offset [Bytes]: ' + str((BytesPerSector * FirstDataSector) + counter))
-                data.append(sector)
-                while byte != b'\x00\x3b':
-                    sector = f.read(BytesPerSector)
-                    counter += 512
-                    slider = 0
-                    if (struct.unpack(">Q", sector[0:8])[0] == 0x89504E470D0A1A0A) or (
-                        struct.unpack(">H", sector[0:2])[0] == 0xFFD8) or (
-                        struct.unpack(">H", sector[0:2])[0] == 0x424D):
-                        endofgif = False
-                        altheader = True
-                        if debug >= 2:
-                            print('\tAlternate header found. Setting flag for 2nd piece search.')
-                        break
-                    else:
-                        while slider != 512:
-                            byte = sector[slider:slider + 2]
-                            if byte != b'\x00\x3b':
-                                if debug >= 3:
-                                    print('\tByte and offset: ' + str(
-                                        (BytesPerSector * FirstDataSector) + counter + slider) + ' : ' + str(byte))
-                                data.append(byte)
-                            else:
-                                data.append(byte)
-                                endofgif = True
-                                break
-                            slider += 2
-            else:
-                if debug >= 3:
-                    print('\tSector offset [Bytes]: ' + str(BytesPerSector * FirstDataSector + counter))
-                    print('\tSector Data: ' + str(sector))
-                sector = f.read(BytesPerSector)
-                counter += 512
-        if endofgif:
-            gifs.append(data)
-            if debug >= 2:
-                print('\tGIF Data [Length]: ' + '[' + str(len(data)) + '] ' + str(data))
-                print('\tGIF MD5 Hash: ' + str(Hasher(data, 'md5'))) #2eeb5d2e239f35faa98b7ad119f4620c
-        else:
-            counter = 0
-            f.seek(BytesPerSector * FirstDataSector)
-            byte = f.read(BytesPerSector)
-            while byte != '':
-                x = BytesPerSector
-                if (struct.unpack(">Q", byte[0:8])[0] != 0x89504E470D0A1A0A) and (
-                            struct.unpack(">H", byte[0:2])[0] != 0xFFD8) and (
-                            struct.unpack(">H", byte[0:2])[0] != 0x424D) and (byte[0:6] != b'GIF89a'):
-                    while x != 0:
-                        if byte[
-                           BytesPerSector - 16:BytesPerSector] == b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00':
-                            firstchars = struct.unpack(">H", byte[x - 2:x])[0]
-                            if firstchars == 0x003B:
-                                GIFFootEnd = (BytesPerSector * FirstDataSector + counter + x - 1)
-                                offsetfromsector = (x - 1)
-                                if debug >= 2:
-                                    print('\tGIF Footer end located at offset [Bytes]: ' + str(GIFFootEnd))
-                                    print('\tOffset from previous sector [Bytes]: ' + str(offsetfromsector))
-                                breaker = True
-                                break
-                            else:
-                                x -= 2
-                        else:
-                            break
-                    if breaker:
-                        break
-                    counter += BytesPerSector
-                    byte = f.read(BytesPerSector)
-                    if debug >= 3:
-                        print('\tNext sector: ' + str(BytesPerSector * FirstDataSector + counter))
-                else:
-                    counter += BytesPerSector
-                    byte = f.read(BytesPerSector)
-
-            while True:
-                f.seek(GIFFootEnd - offsetfromsector - backwards - 16)
-                byte = f.read(16)
-                if byte != b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00':
-                    backwards += BytesPerSector
-                else:
-                    GIFFootStart = GIFFootEnd - offsetfromsector - backwards
-                    if debug >= 2:
-                        print('\tGIF Footer start located at offset [Bytes]: ' + str(GIFFootStart))
-                    break
-            f.seek(GIFFootStart)
-            if debug >= 2:
-                print('\tSeeking to First Data Sector [Bytes]: ' + str(GIFFootStart))
-
-            GIFFootChunk.append(f.read(GIFFootEnd + 1 - GIFFootStart))
-            GIFData = data + GIFFootChunk
-            if debug >= 2:
-                print('\tGIF MD5 Hash: ' + str(Hasher(GIFData, 'md5')))
-            if debug >= 3:
-                print('\tGIF First Chunk: ' + str(data))
-                print('\tGIF Last Chunk: ' + str(GIFFootChunk))
-                print('\tGIF Chunk: ' + str(GIFData))
-
 def SearchGIFs(volume):
     status = True
     error = ''
@@ -397,11 +272,13 @@ def SearchGIFs(volume):
                     slider = 0
                     if (sector[0:6] == b'GIF89a') or (
                         struct.unpack(">H", sector[0:2])[0] == 0xFFD8) or (
-                        struct.unpack(">H", sector[0:2])[0] == 0x424D):
+                        struct.unpack(">H", sector[0:2])[0] == 0x424D) or (struct.unpack(">Q", sector[0:8])[0] == 0x89504E470D0A1A0A):
                         endofgif = False
                         altheader = True
                         if debug >= 2:
                             print('\tAlternate header found at offset ' + str((BytesPerSector * FirstDataSector) + counter) + ' Setting flag for 2nd piece search.')
+                        if debug >= 3:
+                            print('\tMD5 Hash of First Chunk: ' + str(Hasher(data, 'md5')))
                         breaker = True
                         break
                     else:
@@ -409,7 +286,6 @@ def SearchGIFs(volume):
                             if debug >= 3:
                                 print('\tSearching for GIF end.')
                             byte = sector[slider:slider + 2]
-                            print (byte)
                             if byte == b'\x3b\x00':
                                 if debug >= 3:
                                     print('\tByte and offset: ' + str(
@@ -434,6 +310,7 @@ def SearchGIFs(volume):
         if endofgif:
             gifs.append(data)
             if debug >= 2:
+                print('\tEnd of GIF GIF not split.')
                 print('\tGIF Data [Length]: ' + '[' + str(len(data)) + '] ' + str(data))   #0e63e6cc0426d87fd30d597a0a572a27
                 print('\tGIF MD5 Hash: ' + str(Hasher(data, 'md5'))) #0e63e6cc0426d87fd30d597a0a572a27
         else:
@@ -455,8 +332,8 @@ def SearchGIFs(volume):
                         if debug >= 3:
                             print('\tSearching for GIF Footer.')
                         if byte[BytesPerSector - 1:BytesPerSector] == b'\x00':
-                            firstchars = byte[x - 8:x]
-                            if firstchars ==  b'\x49\x45\x4E\x44\xAE\x42\x60\x82':
+                            firstchars = byte[x - 2:x]
+                            if firstchars ==  b'\x3b\x00':
                                 if debug >= 2:
                                     print('\tGIF Footer found.')
                                 GIFFootEnd = (BytesPerSector * FirstDataSector + counter + x - 1)
@@ -481,7 +358,6 @@ def SearchGIFs(volume):
                 else:
                     counter += BytesPerSector
                     byte = f.read(BytesPerSector)
-
             while True:
                 f.seek(GIFFootEnd - offsetfromsector - backwards - 16)
                 byte = f.read(16)
@@ -496,11 +372,11 @@ def SearchGIFs(volume):
             if debug >= 2:
                 print('\tSeeking to First Data Sector [Bytes]: ' + str(GIFFootStart))
 
-            GIFFootChunk.append(f.read(GIFFootEnd + 1 - GIFFootStart))
+            GIFFootChunk.append(f.read(GIFFootEnd - GIFFootStart))
             GIFData = data + GIFFootChunk
             if debug >= 2:
                 print('\tGIF MD5 Hash: ' + str(Hasher(GIFData, 'md5')))
-            if debug >= 3:
+            if debug >= 2:
                 print('\tGIF First Chunk: ' + str(data))
                 print('\tGIF Last Chunk: ' + str(GIFFootChunk))
                 print('\tGIF Chunk: ' + str(GIFData))
@@ -629,7 +505,6 @@ def SearchPNGs(volume):
                 else:
                     counter += BytesPerSector
                     byte = f.read(BytesPerSector)
-
             while True:
                 f.seek(PNGFootEnd - offsetfromsector - backwards - 16)
                 byte = f.read(16)
