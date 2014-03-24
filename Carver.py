@@ -431,7 +431,6 @@ def SearchPNGs(volume):
     offsetfromsector = 0
     breaker = False
 
-
     try:
         if debug >= 1:
             print('Entering SearchPNGs')
