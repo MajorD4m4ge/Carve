@@ -201,9 +201,10 @@ def WriteDatatoFile(path):
         else:
             if debug >= 2:
                 print('\tNo GIF Data found.')
-        ba = b''
+
         if pngs:
             for png in pngs:
+                ba = b''
                 for b in png:
                     ba += b
                 if debug >= 3:
@@ -213,9 +214,10 @@ def WriteDatatoFile(path):
         else:
             if debug >= 2:
                 print('\tNo PNG Data found.')
-        ba = b''
+
         if jpgs:
             for jpg in jpgs:
+                ba = b''
                 for b in jpg:
                     ba += b
                 if debug >= 3:
@@ -225,9 +227,10 @@ def WriteDatatoFile(path):
         else:
             if debug >= 2:
                 print('\tNo JPG Data found.')
-        ba = b''
+
         if bmps:
             for bmp in bmps:
+                ba = b''
                 for b in bmp:
                     ba += b
                 if debug >= 3:
