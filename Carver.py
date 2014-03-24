@@ -74,18 +74,6 @@ class NotValidBootSector(Exception):
         return repr(self.value)
 
 
-def HashMD5(file, block_size=2 ** 20):
-    if debug >= 1:
-        print('Entering HashMD5:')
-    md5 = hashlib.md5()
-    with open(file, 'rb') as f:
-        while True:
-            data = f.read(block_size)
-            if not data:
-                break
-            md5.update(data)
-    return md5.hexdigest()
-
 
 def IdentifyFileSystem(volume):
     status = True
@@ -202,37 +190,54 @@ def WriteDatatoFile(path):
             print('Entering WriteDatatoFile:')
         if debug >= 2:
             print('\tPath entered: ' + str(path))
-        for files in gifs:
-            for b in files:
-               ba += b
-            if debug >= 3:
-                print('\tRaw byte data: ' + str(ba))
-            with open(path + str(Hasher(files, 'md5') + '.gif'), "wb") as f:
-                f.write(ba)
+        if gifs:
+            for files in gifs:
+                for b in files:
+                   ba += b
+                if debug >= 3:
+                    print('\tRaw byte data: ' + str(ba))
+                with open(path + str(Hasher(files, 'md5') + '.gif'), "wb") as f:
+                    f.write(ba)
+        else:
+            if debug >= 2:
+                print('\tNo GIF Data found.')
         ba = b''
-        for files in pngs:
-            for b in files:
-               ba += b
-            if debug >= 3:
-                print('\tRaw byte data: ' + str(ba))
-            with open(path + str(Hasher(files, 'md5') + '.png'), "wb") as f:
-                f.write(ba)
+        if pngs:
+            for files in pngs:
+                for b in files:
+                   ba += b
+                if debug >= 3:
+                    print('\tRaw byte data: ' + str(ba))
+                with open(path + str(Hasher(files, 'md5') + '.png'), "wb") as f:
+                    f.write(ba)
+        else:
+            if debug >= 2:
+                print('\tNo PNG Data found.')
         ba = b''
-        for files in jpgs:
-            for b in files:
-               ba += b
-            if debug >= 3:
-                print('\tRaw byte data: ' + str(ba))
-            with open(path + str(Hasher(files, 'md5') + '.jpg'), "wb") as f:
-                f.write(ba)
+        if jpgs:
+            for files in jpgs:
+                ba = b''
+                for b in files:
+                    ba += b
+                    if debug >= 3:
+                        print('\tRaw byte data: ' + str(ba))
+                with open(path + str(Hasher(files, 'md5') + '.jpg'), "wb") as f:
+                    f.write(ba)
+        else:
+            if debug >= 2:
+                print('\tNo JPG Data found.')
         ba = b''
-        for files in bmps:
-            for b in files:
-               ba += b
-            if debug >= 3:
-                print('\tRaw byte data: ' + str(ba))
-            with open(path + str(Hasher(files, 'md5') + '.bmp'), "wb") as f:
-                f.write(ba)
+        if bmps:
+            for files in bmps:
+                for b in files:
+                   ba += b
+                if debug >= 3:
+                    print('\tRaw byte data: ' + str(ba))
+                with open(path + str(Hasher(files, 'md5') + '.bmp'), "wb") as f:
+                    f.write(ba)
+        else:
+            if debug >= 2:
+                print('\tNo BMP Data found.')
     except:
         error = 'Error: Cannot Write Data.'
         status = False
@@ -258,6 +263,7 @@ def SearchGIFs(volume):
     GIFFootEnd = 0
     offsetfromsector = 0
     breaker = False
+    nodata = False
 
 
     try:
@@ -301,9 +307,16 @@ def SearchGIFs(volume):
                                         print('\tByte and offset: ' + str(
                                             (BytesPerSector * FirstDataSector) + counter + slider) + ' : ' + str(byte))
                                     data.append(sector[0:slider + 1])
-                                    endofgif = True
-                                    breaker = True
-                                    break
+                                    if data:
+                                        endofgif = True
+                                        breaker = True
+                                        break
+                                    else:
+                                        if debug >= 2:
+                                            print('\tNo GIF data found.')
+                                        nodata = True
+                                        breaker = True
+                                        endofgif = True
                                 else:
                                     slider += 1
                         if not breaker:
@@ -318,11 +331,12 @@ def SearchGIFs(volume):
                     else:
                         break
             if endofgif:
-                gifs.append(data)
-                if debug >= 2:
-                    print('\tEnd of GIF GIF not split.')
-                    print('\tGIF Data [Length]: ' + '[' + str(len(data)) + '] ' + str(data))   #0e63e6cc0426d87fd30d597a0a572a27
-                    print('\tGIF MD5 Hash: ' + str(Hasher(data, 'md5'))) #0e63e6cc0426d87fd30d597a0a572a27
+                if nodata:
+                    gifs.append(data)
+                    if debug >= 2:
+                        print('\tEnd of GIF. GIF not split.')
+                        print('\tGIF Data [Length]: ' + '[' + str(len(data)) + '] ' + str(data))   #0e63e6cc0426d87fd30d597a0a572a27
+                        print('\tGIF MD5 Hash: ' + str(Hasher(data, 'md5'))) #0e63e6cc0426d87fd30d597a0a572a27
             else:
                 if debug >= 2:
                     print('\tSearching backwards for GIF End.')
@@ -443,7 +457,7 @@ def SearchPNGs(volume):
                             endofpng = False
                             altheader = True
                             if debug >= 2:
-                                print('\tAlternate header found. Setting flag for 2nd piece search.')
+                                print('\tAlternate header found at ' + str((BytesPerSector * FirstDataSector) + counter) + '. Setting flag for 2nd piece search.')
                             breaker = True
                             break
                         else:
@@ -553,7 +567,7 @@ def SearchPNGs(volume):
         return status, error
 
 
-def SearchBMPHeader(volume):
+def SearchBMPs(volume):
     status = True
     error = ''
     global BytesPerSector
@@ -564,7 +578,7 @@ def SearchBMPHeader(volume):
 
     try:
         if debug >= 1:
-            print('Entering SearchBMPHeader:')
+            print('Entering SearchBMPs:')
         if debug >= 2:
             print('\tVolume Passed in: ' + str(volume))
         with open(volume, "rb") as f:
@@ -596,6 +610,7 @@ def SearchBMPHeader(volume):
     finally:
         return status, error
 
+
 def SearchJPGs(volume):
 
     status = True
@@ -605,7 +620,7 @@ def SearchJPGs(volume):
     byte = b''
     data = []
     global jpgs
-    endofjpg = True
+    endofjpg = False
     processing = True
     altheader = False
     backwards = 0
@@ -615,6 +630,7 @@ def SearchJPGs(volume):
     JPGFootEnd = 0
     offsetfromsector = 0
     breaker = False
+    jpgoffsets = []
 
 
     try:
@@ -629,133 +645,139 @@ def SearchJPGs(volume):
             sector = f.read(BytesPerSector)
             while sector != b'':
                 if struct.unpack(">H", sector[0:2])[0] == 0xFFD8:
+                    data.append(sector)
                     if debug >= 2:
                         print('\tJPG Header found at offset [Bytes]: ' + str((BytesPerSector * FirstDataSector) + counter))
-                    data.append(sector)
-                    while byte != b'\xFF\xD9\x00\x00':
+                        print('\tAppending sector to JPG data array.')
+
+                    while byte != b'\xFF\xD9\x00\x00\x00\x00':
+                        endofjpg = False
+                        if debug >= 3:
+                            print('\tEntering While Loop EOJPG.')
+                            print(endofjpg)
+                        if debug >= 3:
+                            print('\tBytes not equal to JPG footer.')
                         sector = f.read(BytesPerSector)
                         counter += 512
                         slider = 0
                         if (sector[0:6] == b'GIF89a') or (struct.unpack(">H", sector[0:2])[0] == 0x424D) or (struct.unpack(">Q", sector[0:8])[0] == 0x89504E470D0A1A0A):
                             endofjpg = False
-                            altheader = True
                             if debug >= 2:
-                                print('\tAlternate header found. Setting flag for 2nd piece search.')
+                                print('\tAlternate header found at ' + str((BytesPerSector * FirstDataSector) + counter) + '. Setting flag for 2nd piece search.')
+                            if debug >= 2:
+                                print('\tSearching backwards for JPG End.')
+                            counter = 0
+                            breaker = False
+                            byte = b'\x00'
+                            f.seek(BytesPerSector * FirstDataSector)  #seeking to root data again to start looking for end of JPG
+                            sector = f.read(BytesPerSector)
+                            while byte != '':
+                                if debug >= 3:
+                                    print('\tEntering Slider for JPG.')
+                                x = 512
+                                if (struct.unpack(">Q", sector[0:8])[0] != 0x89504E470D0A1A0A) and (
+                                            struct.unpack(">H", sector[0:2])[0] != 0xFFD8) and (
+                                            struct.unpack(">H", sector[0:2])[0] != 0x424D) and (sector[0:6] != b'GIF89a'):
+                                    while x != 0:
+                                        if debug >= 3:
+                                            print('\tSearching for JPG Footer.')
+                                        if byte[BytesPerSector - 1:BytesPerSector] == b'\x00':
+                                            firstchars = byte[x - 8:x]
+                                            if firstchars ==  b'\xFF\xD9\x00\x00':
+                                                if debug >= 2:
+                                                    print('\tJPG Footer found.')
+                                                JPGFootEnd = (BytesPerSector * FirstDataSector + counter + x - 1)
+                                                offsetfromsector = (x - 3)
+                                                if debug >= 2:
+                                                    print('\tJPG Footer end located at offset [Bytes]: ' + str(JPGFootEnd))
+                                                    print('\tOffset from previous sector [Bytes]: ' + str(offsetfromsector))
+                                                breaker = True
+                                                break
+                                            else:
+                                                x -= 1
+                                        else:
+                                            if debug >= 3:
+                                                print('\tLast byte not \\x00.')
+                                            break
+                                    if breaker:
+                                        break
+                                    counter += BytesPerSector
+                                    byte = f.read(BytesPerSector)
+                                    if debug >= 3:
+                                        print('\tNext sector: ' + str(BytesPerSector * FirstDataSector + counter))
+                                else:
+                                    counter += BytesPerSector
+                                    byte = f.read(BytesPerSector)
+                            while True:
+                                f.seek(JPGFootEnd - offsetfromsector - backwards - 16)
+                                byte = f.read(16)
+                                if byte != b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00':
+                                    backwards += BytesPerSector
+                                else:
+                                    JPGFootStart = JPGFootEnd - offsetfromsector - backwards
+                                    if debug >= 2:
+                                        print('\tJPG Footer start located at offset [Bytes]: ' + str(JPGFootStart))
+                                    break
+                            f.seek(JPGFootStart)
+                            if debug >= 2:
+                                print('\tSeeking to First Data Sector [Bytes]: ' + str(JPGFootStart))
+
+                            JPGFootChunk.append(f.read(JPGFootEnd + 1 - JPGFootStart))
+                            JPGData = data + JPGFootChunk
+                            if debug >= 2:
+                                print('\tJPG MD5 Hash: ' + str(Hasher(JPGData, 'md5')))
+                            if debug >= 3:
+                                print('\tJPG First Chunk: ' + str(data))
+                                print('\tJPG Last Chunk: ' + str(JPGFootChunk))
+                                print('\tJPG Chunk: ' + str(JPGData))
                             breaker = True
                             break
                         else:
                             while slider != 512:
                                 if debug >= 3:
                                     print('\tSearching for JPG end.')
-                                byte = sector[slider:slider + 4]
-                                if byte == b'\xFF\xD9\x00\x00':
+                                byte = sector[slider:slider + 6]
+                                if byte == b'\xFF\xD9\x00\x00\x00\x00':
                                     if debug >= 2:
-                                        print('\tByte and offset: ' + str(
+                                        print('\tJPG Footer bytes and offset: ' + str(
                                             (BytesPerSector * FirstDataSector) + counter + slider) + ' : ' + str(byte))
                                     data.append(sector[0:slider + 2])
+                                    jpgs.append(data)
+                                    if debug >= 2:
+                                        print(Hasher(data, 'md5'))
                                     endofjpg = True
-                                    breaker = True
+                                    data = []
                                     break
                                 else:
                                     slider += 1
-                        if not breaker:
+                        if not endofjpg:
                             data.append(sector)
+                        else:
+                            print(byte)
                 else:
                     if debug >= 3:
                         print('\tSector offset [Bytes]: ' + str(BytesPerSector * FirstDataSector + counter))
                         print('\tSector Data: ' + str(sector))
-                    if not breaker:
-                        sector = f.read(BytesPerSector)
-                        counter += 512
-                    else:
-
-                        break
-            if endofjpg:
-                jpgs.append(data)
-                if debug >= 2:
-                    print('\tJPG Data [Length]: ' + '[' + str(len(data)) + '] ' + str(data))   #0e63e6cc0426d87fd30d597a0a572a27
-                    print('\tJPG MD5 Hash: ' + str(Hasher(data, 'md5'))) #0e63e6cc0426d87fd30d597a0a572a27
-            else:
-                if debug >= 2:
-                    print('\tSearching backwards for JPG End.')
-                counter = 0
-                breaker = False
-                byte = b'\x00'
-                f.seek(BytesPerSector * FirstDataSector)
-                sector = f.read(BytesPerSector)
-                while byte != '':
-                    if debug >= 3:
-                        print('\tEntering Slider for JPG.')
-                    x = 512
-                    if (struct.unpack(">Q", sector[0:8])[0] != 0x89504E470D0A1A0A) and (
-                                struct.unpack(">H", sector[0:2])[0] != 0xFFD8) and (
-                                struct.unpack(">H", sector[0:2])[0] != 0x424D) and (sector[0:6] != b'GIF89a'):
-                        while x != 0:
-                            if debug >= 3:
-                                print('\tSearching for JPG Footer.')
-                            if byte[BytesPerSector - 1:BytesPerSector] == b'\x00':
-                                firstchars = byte[x - 8:x]
-                                if firstchars ==  b'\x49\x45\x4E\x44\xAE\x42\x60\x82':
-                                    if debug >= 2:
-                                        print('\tJPG Footer found.')
-                                    JPGFootEnd = (BytesPerSector * FirstDataSector + counter + x - 1)
-                                    offsetfromsector = (x - 1)
-                                    if debug >= 2:
-                                        print('\tJPG Footer end located at offset [Bytes]: ' + str(JPGFootEnd))
-                                        print('\tOffset from previous sector [Bytes]: ' + str(offsetfromsector))
-                                    breaker = True
-                                    break
-                                else:
-                                    x -= 1
-                            else:
-                                if debug >= 3:
-                                    print('\tLast byte not \\x00.')
-                                break
-                        if breaker:
-                            break
-                        counter += BytesPerSector
-                        byte = f.read(BytesPerSector)
-                        if debug >= 3:
-                            print('\tNext sector: ' + str(BytesPerSector * FirstDataSector + counter))
-                    else:
-                        counter += BytesPerSector
-                        byte = f.read(BytesPerSector)
-                while True:
-                    f.seek(JPGFootEnd - offsetfromsector - backwards - 16)
-                    byte = f.read(16)
-                    if byte != b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00':
-                        backwards += BytesPerSector
-                    else:
-                        JPGFootStart = JPGFootEnd - offsetfromsector - backwards
-                        if debug >= 2:
-                            print('\tJPG Footer start located at offset [Bytes]: ' + str(JPGFootStart))
-                        break
-                f.seek(JPGFootStart)
-                if debug >= 2:
-                    print('\tSeeking to First Data Sector [Bytes]: ' + str(JPGFootStart))
-
-                JPGFootChunk.append(f.read(JPGFootEnd + 1 - JPGFootStart))
-                JPGData = data + JPGFootChunk
-                if debug >= 2:
-                    print('\tJPG MD5 Hash: ' + str(Hasher(JPGData, 'md5')))
-                if debug >= 3:
-                    print('\tJPG First Chunk: ' + str(data))
-                    print('\tJPG Last Chunk: ' + str(JPGFootChunk))
-                    print('\tJPG Chunk: ' + str(JPGData))
+                    byte = b''
+                    sector = f.read(BytesPerSector)
+                    counter += 512
 
     except:
         error = 'Error: Cannot Find Valid Headers.'
         status = False
     finally:
+        if debug >= 2:
+            print('\tTotal JPGs Found: ' + str(len(jpgs)))
         return status, error
+
 
 def Hasher(data, hashtype):
     ba = b''
     for x in data:
         ba += bytearray(x)
-    if (hashtype == 'md5'):
+    if hashtype == 'md5':
         return hashlib.md5(ba).hexdigest()
-    elif (hashtype == 'sha1'):
+    elif hashtype == 'sha1':
         return hashlib.sha1(ba).hexdigest()
 
 
@@ -867,31 +889,33 @@ def main(argv):
         else:
             print('| [-] Reading Boot Sector.                                                 |')
             Failed(error)
-        status, error = SearchGIFs(volume)
-        if status:
-            print('| [+] Searching for GIF Data.                                              |')
-        else:
-            print('| [-] Searching for GIF Data.                                              |')
-            Failed(error)
-        status, error = SearchPNGs(volume)
-        if status:
-            print('| [+] Searching for PNG Data.                                              |')
-        else:
-            print('| [-] Searching for PNG Data.                                              |')
-            Failed(error)
-        status, error = SearchBMPHeader(volume)
-        if status:
-            print('| [+] Searching for BMP Data.                                              |')
-        else:
-            print('| [-] Searching for BMP Data.                                              |')
-            Failed(error)
-
         status, error = SearchJPGs(volume)
         if status:
             print('| [+] Searching for JPG Data.                                              |')
         else:
             print('| [-] Searching for JPG Data.                                              |')
             Failed(error)
+        # sys.exit()
+        # status, error = SearchGIFs(volume)
+        # if status:
+        #     print('| [+] Searching for GIF Data.                                              |')
+        # else:
+        #     print('| [-] Searching for GIF Data.                                              |')
+        #     Failed(error)
+        # status, error = SearchPNGs(volume)
+        # if status:
+        #     print('| [+] Searching for PNG Data.                                              |')
+        # else:
+        #     print('| [-] Searching for PNG Data.                                              |')
+        #     Failed(error)
+        # status, error = SearchBMPs(volume)
+        # if status:
+        #     print('| [+] Searching for BMP Data.                                              |')
+        # else:
+        #     print('| [-] Searching for BMP Data.                                              |')
+        #     Failed(error)
+
+
         status, error = WriteDatatoFile(path)
         if status:
             print('| [+] Writing Output.                                                      |')
