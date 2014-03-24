@@ -194,10 +194,10 @@ def WriteDatatoFile(path):
             for g in gifs:
                 for b in g:
                     ba += b
-                    if debug >= 3:
-                        print('\tRaw byte data: ' + str(ba))
-                    with open(path + str(Hasher(g, 'md5') + '.gif'), "wb") as f:
-                        f.write(ba)
+                if debug >= 3:
+                    print('\tRaw byte data: ' + str(ba))
+                with open(path + str(Hasher(g, 'md5') + '.gif'), "wb") as f:
+                    f.write(ba)
         else:
             if debug >= 2:
                 print('\tNo GIF Data found.')
@@ -206,10 +206,10 @@ def WriteDatatoFile(path):
             for png in pngs:
                 for b in png:
                     ba += b
-                    if debug >= 3:
-                        print('\tRaw byte data: ' + str(ba))
-                    with open(path + str(Hasher(png, 'md5') + '.png'), "wb") as f:
-                        f.write(ba)
+                if debug >= 3:
+                    print('\tRaw byte data: ' + str(ba))
+                with open(path + str(Hasher(png, 'md5') + '.png'), "wb") as f:
+                    f.write(ba)
         else:
             if debug >= 2:
                 print('\tNo PNG Data found.')
@@ -218,10 +218,10 @@ def WriteDatatoFile(path):
             for jpg in jpgs:
                 for b in jpg:
                     ba += b
-                    if debug >= 3:
-                        print('\tRaw byte data: ' + str(ba))
-                    with open(path + str(Hasher(jpg, 'md5') + '.jpg'), "wb") as f:
-                        f.write(ba)
+                if debug >= 3:
+                    print('\tRaw byte data: ' + str(ba))
+                with open(path + str(Hasher(jpg, 'md5') + '.jpg'), "wb") as f:
+                    f.write(ba)
         else:
             if debug >= 2:
                 print('\tNo JPG Data found.')
@@ -230,10 +230,10 @@ def WriteDatatoFile(path):
             for bmp in bmps:
                 for b in bmp:
                     ba += b
-                    if debug >= 3:
-                        print('\tRaw byte data: ' + str(ba))
-                    with open(path + str(Hasher(bmp, 'md5') + '.bmp'), "wb") as f:
-                        f.write(ba)
+                if debug >= 3:
+                    print('\tRaw byte data: ' + str(ba))
+                with open(path + str(Hasher(bmp, 'md5') + '.bmp'), "wb") as f:
+                    f.write(ba)
         else:
             if debug >= 2:
                 print('\tNo BMP Data found.')
