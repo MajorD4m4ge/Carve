@@ -612,7 +612,6 @@ def SearchBMPs(volume):
 
 
 def SearchJPGs(volume):
-
     status = True
     error = ''
     counter = 0
@@ -621,8 +620,6 @@ def SearchJPGs(volume):
     data = []
     global jpgs
     endofjpg = False
-    processing = True
-    altheader = False
     backwards = 0
     JPGFootChunk = []
     JPGData = []
@@ -630,7 +627,6 @@ def SearchJPGs(volume):
     JPGFootEnd = 0
     offsetfromsector = 0
     breaker = False
-    jpgoffsets = []
 
 
     try:
