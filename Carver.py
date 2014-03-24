@@ -628,7 +628,7 @@ def SearchJPGs(volume):
             sector = f.read(BytesPerSector)
             while sector != b'':
                 if struct.unpack(">H", sector[0:2])[0] == 0xFFD8:
-                    if debug >= 2:
+                    if debug >= 3:
                         print('\tJPG Header found at offset [Bytes]: ' + str((BytesPerSector * FirstDataSector) + counter))
                     data.append(sector)
                     while byte != b'\xFF\xD9\x00\x00':
@@ -656,11 +656,16 @@ def SearchJPGs(volume):
                                     breaker = True
                                     jpgs.append(data)
                                     data = []
+
                                     break
                                 else:
                                     slider += 1
                         if not breaker:
                             data.append(sector)
+                        else:
+                            sector = f.read(BytesPerSector)
+                            counter += 512
+                            byte = b''
                 #Found JPG
                 else:
                     if debug >= 2:
@@ -671,7 +676,6 @@ def SearchJPGs(volume):
                     counter += 512
                     #else:
                     #    break
-                    print(sector)
             if endofjpg:
                 #jpgs.append(data)
 
