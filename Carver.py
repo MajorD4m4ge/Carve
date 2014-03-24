@@ -656,7 +656,6 @@ def SearchJPGs(volume):
                                     breaker = True
                                     jpgs.append(data)
                                     data = []
-
                                     break
                                 else:
                                     slider += 1
