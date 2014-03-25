@@ -578,7 +578,7 @@ def SearchBMPs(volume):
             f.seek(BytesPerSector * FirstDataSector)
             sector = f.read(BytesPerSector)
 
-            while sector != '':
+            while sector != b'':
                 if struct.unpack(">H", sector[0:2])[0] == 0x424D:
                     BMPFilesize = struct.unpack("<H", sector[2:4])[0]
                     if debug >= 2:
@@ -604,17 +604,16 @@ def SearchBMPs(volume):
                                 BMPData.append(sector[0:bytestoread])
                                 bytestoread -= bytestoread
                                 endofbmp = True
+                                if debug >= 2:
+                                    print('\tBMP Data: ' + str(BMPData))
+                                    print('\tBMP MD5 Hash: ' + Hasher(BMPData, 'md5'))
                                 if debug >= 3:
                                     print('\tBytes left: ' + str(bytestoread))
                                 break
                     bmps.append(BMPData)
-                    break
                 else:
                     sector = f.read(BytesPerSector)
                     counter += BytesPerSector
-            if debug >= 2:
-                print('\tBMP First Chunk: ' + str(BMPData))
-                print('\tBMP MD5 Hash: ' + Hasher(BMPData, 'md5'))
     except:
         error = 'Error: Cannot Find BMP Valid Headers.'
         status = False
