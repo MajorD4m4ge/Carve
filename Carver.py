@@ -847,9 +847,9 @@ signal.signal(signal.SIGINT, signal_handler)
 
 
 def main(argv):
-    #try:
+    try:
         global debug
-    #parse the command-line arguments
+        #parse the command-line arguments
         parser = argparse.ArgumentParser(description="A FAT32 file system carver.",
                                          add_help=True)
         parser.add_argument('-p', '--path', help='The path to write the files to.', required=True)
@@ -924,11 +924,11 @@ def main(argv):
         else:
             print('| [-] Writing Output.                                                      |')
             Failed(error)
-    Completed(path)
-    FileHashes()
+        Completed(path)
+        FileHashes()
 
-    #except:
-        print()
+    except:
+        print('Error.')
 
 
 main(sys.argv[1:])
