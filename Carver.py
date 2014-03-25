@@ -78,23 +78,26 @@ class NotValidBootSector(Exception):
 def IdentifyFileSystem(volume):
     status = True
     error = ''
+    bootsector = True
     global BootSectorSize
     global ValidBytesPerSector
 
     try:
         if debug >= 1:
-            Writer('Entering ReadBootSector:')
+            print('Entering IdentifyFileSystem:')
         with open(volume, "rb") as f:
             byte = f.read(BootSectorSize)
             BytesPerSector = struct.unpack("<H", byte[11:13])[0]
             if BytesPerSector not in ValidBytesPerSector:
-                raise NotValidBootSector('Only FAT32 supported.')
+                #raise NotValidBootSector('Only FAT32 supported.')
+                BytesPerSector = 512
+                bootsector = False
 
     except:
         status = False
         error = 'Cannot read Boot Sector.'
     finally:
-        return status, error
+        return status, error, bootsector
 
 
 def ReadBootSector(volume):
@@ -116,6 +119,7 @@ def ReadBootSector(volume):
     global DataAreaEnd
     global FirstDataSector
     # </editor-fold>
+    nobootsector = False
     status = True
     error = ''
 
@@ -127,7 +131,8 @@ def ReadBootSector(volume):
             byte = f.read(BootSectorSize)
             BytesPerSector = struct.unpack("<H", byte[11:13])[0]
             if BytesPerSector not in ValidBytesPerSector:
-                print('Error: This is not a FAT32 drive.')
+                BytesPerSector = 512
+                nobootsector = True
             SectorsPerCluster = struct.unpack("<b", byte[13:14])[0]
             ReservedSectorCount = struct.unpack("<H", byte[14:16])[0]
             NumberOfFATs = struct.unpack("<b", byte[16:17])[0]
@@ -143,28 +148,36 @@ def ReadBootSector(volume):
 
             DataAreaStart = ReservedSectorCount + TotalFAT32Sectors
             DataAreaEnd = TotalSectors - 1  #Base 0
-            FirstDataSector = ReservedSectorCount + (NumberOfFATs * FAT32Size) + RootDirSectors
-            if debug >= 1:
-                print('\tBytes per Sector: ' + str(BytesPerSector))
-                print('\tSectors per Cluster: ' + str(SectorsPerCluster))
-                print('\tCluster Size: ' + str(ClusterSize))
-                print('\tRoot Cluster: ' + str(RootCluster))
-                print('\tFSInfo Cluster: ' + str(FSInfoSector))
-                print('\tTotal Sectors: ' + str(TotalSectors))
-                print('\tReserved Sector Count: ' + str(ReservedSectorCount))
-                print('\tReserved Sectors: ' + '0  - ' + str(ReservedSectorCount - 1))
-                print('\tFAT Offset: ' + str(ReservedSectorCount))
-                print('\tFAT Offset (Bytes): ' + str(ReservedSectorCount * BytesPerSector))
-                print('\tNumber of FATs: ' + str(NumberOfFATs))
-                print('\tFAT32 Size: ' + str(FAT32Size))
-                print('\tTotal FAT32 Sectors: ' + str(TotalFAT32Sectors))
-                print('\tFAT Sectors: ' + str(ReservedSectorCount) + ' - ' + str(
-                    (ReservedSectorCount - 1) + (FAT32Size * NumberOfFATs)))
-                print('\tData Area: ' + str(DataAreaStart) + ' - ' + str(DataAreaEnd))
-                print('\tData Area Offset (Bytes): ' + str(DataAreaStart * BytesPerSector))
-                #print('\tRoot Directory: ' + str(DataAreaStart) + ' - ' + str(DataAreaStart + 3))
-                #Extra Testing
-                print('\t   First Data Sector: ' + str(FirstDataSector))
+            if not nobootsector:
+                FirstDataSector = ReservedSectorCount + (NumberOfFATs * FAT32Size) + RootDirSectors
+                if debug >= 2:
+                    print('\tFirstDataSector = ' + str(FirstDataSector))
+            else:
+                FirstDataSector = 0
+                if debug >= 2:
+                    print('\tFirstDataSector = ' + str(FirstDataSector))
+            if not nobootsector:
+                if debug >= 1:
+                    print('\tBytes per Sector: ' + str(BytesPerSector))
+                    print('\tSectors per Cluster: ' + str(SectorsPerCluster))
+                    print('\tCluster Size: ' + str(ClusterSize))
+                    print('\tRoot Cluster: ' + str(RootCluster))
+                    print('\tFSInfo Cluster: ' + str(FSInfoSector))
+                    print('\tTotal Sectors: ' + str(TotalSectors))
+                    print('\tReserved Sector Count: ' + str(ReservedSectorCount))
+                    print('\tReserved Sectors: ' + '0  - ' + str(ReservedSectorCount - 1))
+                    print('\tFAT Offset: ' + str(ReservedSectorCount))
+                    print('\tFAT Offset (Bytes): ' + str(ReservedSectorCount * BytesPerSector))
+                    print('\tNumber of FATs: ' + str(NumberOfFATs))
+                    print('\tFAT32 Size: ' + str(FAT32Size))
+                    print('\tTotal FAT32 Sectors: ' + str(TotalFAT32Sectors))
+                    print('\tFAT Sectors: ' + str(ReservedSectorCount) + ' - ' + str(
+                        (ReservedSectorCount - 1) + (FAT32Size * NumberOfFATs)))
+                    print('\tData Area: ' + str(DataAreaStart) + ' - ' + str(DataAreaEnd))
+                    print('\tData Area Offset (Bytes): ' + str(DataAreaStart * BytesPerSector))
+                    #print('\tRoot Directory: ' + str(DataAreaStart) + ' - ' + str(DataAreaStart + 3))
+                    #Extra Testing
+                    print('\t   First Data Sector: ' + str(FirstDataSector))
     except IOError:
         status = False
         error = 'Volume ' + str(volume) + ' does not exist.'
@@ -438,12 +451,10 @@ def SearchPNGs(volume):
                         slider = 0
                         if (sector[0:6] == b'GIF89a') or (
                             struct.unpack(">H", sector[0:2])[0] == 0xFFD8) or (
-                            struct.unpack(">H", sector[0:2])[0] == 0x424D):
+                            struct.unpack(">H", sector[0:2])[0] == 0x424D) or (struct.unpack(">Q", sector[0:8])[0] == 0x89504E470D0A1A0A):
                             endofpng = False
                             if debug >= 2:
                                 print('\tAlternate header found at ' + str((BytesPerSector * FirstDataSector) + counter) + '. Setting flag for 2nd piece search.')
-                                print('\tSearching backwards for PNG End.')
-                            if debug >= 2:
                                 print('\tSearching backwards for PNG End.')
                             counter = 0
                             breaker = False
@@ -553,6 +564,7 @@ def SearchBMPs(volume):
     global FirstDataSector
     global BMPData
     global bmps
+    endofbmp = False
     counter = 0
 
     try:
@@ -567,14 +579,34 @@ def SearchBMPs(volume):
             sector = f.read(BytesPerSector)
 
             while sector != '':
-                firstchars = struct.unpack(">H", sector[0:2])[0]
-                if firstchars == 0x424D:
+                if struct.unpack(">H", sector[0:2])[0] == 0x424D:
                     BMPFilesize = struct.unpack("<H", sector[2:4])[0]
                     if debug >= 2:
                         print('\tBMP Header found at offset: ' + str((BytesPerSector * FirstDataSector) + counter))
                         print('\tBMP Filesize: ' + str(BMPFilesize))
                     BMPData.append(sector)
-                    BMPData.append(f.read(BMPFilesize - BytesPerSector))
+                    bytestoread = BMPFilesize - BytesPerSector
+                    while True:
+                        sector = f.read(BytesPerSector)
+                        counter += BytesPerSector
+                        if (sector[0:6] == b'GIF89a') or (
+                            struct.unpack(">H", sector[0:2])[0] == 0xFFD8) or (
+                            struct.unpack(">H", sector[0:2])[0] == 0x424D) or (struct.unpack(">Q", sector[0:8])[0] == 0x89504E470D0A1A0A):
+                            if debug >= 2:
+                                print('\tAlternate BMP header found at ' + str((BytesPerSector * FirstDataSector) + counter) + '. Setting flag for 2nd piece search.')
+                            endofbmp = False
+                            break
+                        else:
+                            if bytestoread > 512:
+                                BMPData.append(sector)
+                                bytestoread -= 512
+                            else:
+                                BMPData.append(sector[0:bytestoread])
+                                bytestoread -= bytestoread
+                                endofbmp = True
+                                if debug >= 3:
+                                    print('\tBytes left: ' + str(bytestoread))
+                                break
                     bmps.append(BMPData)
                     break
                 else:
@@ -584,7 +616,7 @@ def SearchBMPs(volume):
                 print('\tBMP First Chunk: ' + str(BMPData))
                 print('\tBMP MD5 Hash: ' + Hasher(BMPData, 'md5'))
     except:
-        error = 'Error: Cannot Find Valid Headers.'
+        error = 'Error: Cannot Find BMP Valid Headers.'
         status = False
     finally:
         return status, error
@@ -849,7 +881,7 @@ def main(argv):
 
 
         Header()
-        status, error = IdentifyFileSystem(volume)
+        status, error, bootsector = IdentifyFileSystem(volume)
         if status:
             print('| [+] Identifying File System.                                             |')
         else:
@@ -857,9 +889,9 @@ def main(argv):
             Failed(error)
         status, error = ReadBootSector(volume)
         if status:
-            print('| [+] Reading Boot Sector.                                                 |')
+            print('| [+] Identifying Boot Sector.                                             |')
         else:
-            print('| [-] Reading Boot Sector.                                                 |')
+            print('| [-] Identifying Boot Sector.                                             |')
             Failed(error)
         status, error = SearchJPGs(volume)
         if status:
