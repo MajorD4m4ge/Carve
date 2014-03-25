@@ -836,8 +836,10 @@ def FileHashes():
     sys.exit(0)
 
 
-def Completed():
+def Completed(outputpath):
     print('| [*] Completed.                                                           |')
+    print('+--------------------------------------------------------------------------+')
+    print(' Output Path: ' + str(outputpath))
     print('+--------------------------------------------------------------------------+')
 
 
@@ -922,8 +924,8 @@ def main(argv):
         else:
             print('| [-] Writing Output.                                                      |')
             Failed(error)
-        Completed()
-        FileHashes()
+    Completed(path)
+    FileHashes()
 
     #except:
         print()
