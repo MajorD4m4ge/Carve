@@ -1,5 +1,6 @@
-#TODO Create list of images found to handle more than 1 image per type
-#TODO Create file creator that writes out files with counter, or maybe just hashes
+#TODO Verify b'' not '' for all searches
+#TODO Verify that I am incrementing sectors, not bytes
+#TODO Find out how to search backwards and what ends.
 #0e63e6cc0426d87fd30d597a0a572a27,2d70374751335bcea8b6e3a8ced85a5fd2fe142e,png
 #34e4a705ab20b8c39b053cdd0d2e145e,f3ce8b3ead5836d054da50b149e83ea17ca1d4ee,jpg
 #2eeb5d2e239f35faa98b7ad119f4620c,ecb8ed802f44962c996a0888c03946d94141f7fa,gif
@@ -291,7 +292,7 @@ def SearchGIFs(volume):
             sector = f.read(BytesPerSector)
             while sector != b'':
                 #Identify GIF Header
-                if sector[0:6] == b'GIF89a':
+                if sector[0:6] == b'GIF89a' or sector[0:6] == b'GIF87a':
                     if debug >= 2:
                         print('\tGIF Header found at offset [Bytes]: ' + str((BytesPerSector * FirstDataSector) + counter))
                     data.append(sector)
@@ -302,11 +303,10 @@ def SearchGIFs(volume):
                             break
                         counter += 512
                         slider = 0
-                        if (sector[0:6] == b'GIF89a') or (
+                        if (sector[0:6] == b'GIF89a') or sector[0:6] == b'GIF87a' or (
                             struct.unpack(">H", sector[0:2])[0] == 0xFFD8) or (
                             struct.unpack(">H", sector[0:2])[0] == 0x424D) or (struct.unpack(">Q", sector[0:8])[0] == 0x89504E470D0A1A0A):
                             endofgif = False
-                            altheader = True
                             if debug >= 2:
                                 print('\tAlternate header found at offset ' + str((BytesPerSector * FirstDataSector) + counter) + ' Setting flag for 2nd piece search.')
                             if debug >= 3:
@@ -478,7 +478,7 @@ def SearchPNGs(volume):
                                             print('\tSearching for PNG Footer.')
                                         if byte[BytesPerSector - 1:BytesPerSector] == b'\x00':
                                             firstchars = byte[x - 8:x]
-                                            if firstchars ==  b'\x49\x45\x4E\x44\xAE\x42\x60\x82':
+                                            if firstchars == b'\x49\x45\x4E\x44\xAE\x42\x60\x82':
                                                 if debug >= 2:
                                                     print('\tPNG Footer found.')
                                                 PNGFootEnd = (BytesPerSector * FirstDataSector + counter + x - 1)
@@ -686,7 +686,7 @@ def SearchJPGs(volume):
                         counter += 512
                         slider = 0
 
-                        if (sector[0:6] == b'GIF89a') or (struct.unpack(">H", sector[0:2])[0] == 0x424D) or (struct.unpack(">Q", sector[0:8])[0] == 0x89504E470D0A1A0A):
+                        if (sector[0:6] == b'GIF89a') or (struct.unpack(">H", sector[0:2])[0] == 0x424D) or (struct.unpack(">Q", sector[0:8])[0] == 0x89504E470D0A1A0A) or (struct.unpack(">H", sector[0:2])[0] == 0xFFD8):
                             endofjpg = False
                             if debug >= 2:
                                 print('\tAlternate header found at ' + str((BytesPerSector * FirstDataSector) + counter) + '. Setting flag for 2nd piece search.')
@@ -697,22 +697,25 @@ def SearchJPGs(volume):
                             byte = b'\x00'
                             f.seek(BytesPerSector * FirstDataSector)  #seeking to root data again to start looking for end of JPG
                             sector = f.read(BytesPerSector)
-                            while byte != '':
-                                if debug >= 3:
+                            #counter += 512
+                            while sector != b'':
+                                if debug >= 4:
                                     print('\tEntering Slider for JPG.')
-                                x = 512
+                                x = BytesPerSector
                                 if (struct.unpack(">Q", sector[0:8])[0] != 0x89504E470D0A1A0A) and (
                                             struct.unpack(">H", sector[0:2])[0] != 0xFFD8) and (
                                             struct.unpack(">H", sector[0:2])[0] != 0x424D) and (sector[0:6] != b'GIF89a'):
                                     while x != 0:
-                                        if debug >= 3:
+                                        if debug >= 4:
                                             print('\tSearching for JPG Footer.')
-                                        if byte[BytesPerSector - 1:BytesPerSector] == b'\x00':
-                                            firstchars = byte[x - 8:x]
+                                        if sector[BytesPerSector - 1:BytesPerSector] == b'\x00':
+                                            if debug >= 3:
+                                                print('\tLast byte of sector is \\x00.')
+                                            firstchars = sector[x - 4:x]
                                             if firstchars == b'\xFF\xD9\x00\x00':
                                                 if debug >= 2:
                                                     print('\tJPG Footer found.')
-                                                JPGFootEnd = (BytesPerSector * FirstDataSector + counter + x - 1)
+                                                JPGFootEnd = (BytesPerSector * FirstDataSector + counter + x - 3)
                                                 offsetfromsector = (x - 3)
                                                 if debug >= 2:
                                                     print('\tJPG Footer end located at offset [Bytes]: ' + str(JPGFootEnd))
@@ -728,16 +731,16 @@ def SearchJPGs(volume):
                                     if breaker:
                                         break
                                     counter += BytesPerSector
-                                    byte = f.read(BytesPerSector)
+                                    sector = f.read(BytesPerSector)
                                     if debug >= 3:
                                         print('\tNext sector: ' + str(BytesPerSector * FirstDataSector + counter))
                                 else:
+                                    sector = f.read(BytesPerSector)
                                     counter += BytesPerSector
-                                    byte = f.read(BytesPerSector)
                             while True:
                                 f.seek(JPGFootEnd - offsetfromsector - backwards - 16)
-                                byte = f.read(16)
-                                if byte != b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00':
+                                barray = f.read(16)
+                                if barray != b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00':
                                     backwards += BytesPerSector
                                 else:
                                     JPGFootStart = JPGFootEnd - offsetfromsector - backwards
@@ -750,6 +753,8 @@ def SearchJPGs(volume):
 
                             JPGFootChunk.append(f.read(JPGFootEnd + 1 - JPGFootStart))
                             JPGData = data + JPGFootChunk
+                            jpgs.append(JPGData)
+                            JPGData = []
                             if debug >= 2:
                                 print('\tJPG MD5 Hash: ' + str(Hasher(JPGData, 'md5')))
                             if debug >= 3:
