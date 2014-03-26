@@ -865,7 +865,6 @@ def FileHashes():
         for files in gifs:
             print('| GIF Hash: ' + str(Hasher(files, 'md5')) + '                               |')
     print('+--------------------------------------------------------------------------+')
-    sys.exit(0)
 
 
 def Completed():
@@ -962,7 +961,7 @@ def main(argv):
 
 
     except:
-        print('Error.')
+        sys.exit(0)
 
 
 main(sys.argv[1:])
