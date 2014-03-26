@@ -657,8 +657,8 @@ def SearchJPGs(volume):
     breaker = False
 
 
-    #try:
-    if debug >= 1:
+    try:
+        if debug >= 1:
             print('Entering SearchJPGs')
         if debug >= 2:
             print('\tVolume Passed in: ' + str(volume))
@@ -790,10 +790,15 @@ def SearchJPGs(volume):
                     #error = 'Error: Cannot Find Valid Headers.'
                     #status = False
                     #finally:
-    if debug >= 2:
-            print('\tTotal JPGs Found: ' + str(len(jpgs)))
-            print(error)
-    return status, error
+        if debug >= 2:
+                print('\tTotal JPGs Found: ' + str(len(jpgs)))
+                print(error)
+    except:
+        error = 'Error: Cannot Find JPG Valid Headers.'
+        status = False
+    finally:
+        return status, error
+
 
 
 def Hasher(data, hashtype):
@@ -873,25 +878,24 @@ signal.signal(signal.SIGINT, signal_handler)
 
 
 def main(argv):
-    #try:
-    global debug
-    md5 = False
-    #parse the command-line arguments
-        parser = argparse.ArgumentParser(description="A FAT32 file system carver.",
-                                         add_help=True)
+    try:
+        global debug
+        md5 = False
+        #parse the command-line arguments
+        parser = argparse.ArgumentParser(description="A FAT32 file system carver.", add_help=True)
         parser.add_argument('-p', '--path', help='The path to write the files to.', required=True)
         parser.add_argument('-v', '--volume', help='The volume to read from.', required=True)
-    parser.add_argument('-m', '--md5', help='Hash output files.', action='store_true', required=False)
-    parser.add_argument('-d', '--debug', help='The level of debugging.', required=False)
+        parser.add_argument('-m', '--md5', help='Hash output files.', action='store_true', required=False)
+        parser.add_argument('-d', '--debug', help='The level of debugging.', required=False)
         parser.add_argument('--version', action='version', version='%(prog)s 1.5')
         args = parser.parse_args()
         if args.volume:
             volume = args.volume
         if args.path:
             path = args.path
-    if args.md5:
-        md5 = True
-    if args.debug:
+        if args.md5:
+            md5 = True
+        if args.debug:
             debug = args.debug
             debug = int(debug)
         if _platform == "linux" or _platform == "linux2":
@@ -909,8 +913,8 @@ def main(argv):
             #    print ('Error: System not supported.')
             #    sys.exit(1)
 
-    Header(volume, path)
-    status, error, bootsector = IdentifyFileSystem(volume)
+        Header(volume, path)
+        status, error, bootsector = IdentifyFileSystem(volume)
         if status:
             print('| [+] Identifying File System.                                             |')
         else:
@@ -952,13 +956,13 @@ def main(argv):
         else:
             print('| [-] Writing Output.                                                      |')
             Failed(error)
-    if md5:
-        FileHashes()
-    Completed()
+        if md5:
+            FileHashes()
+        Completed()
 
 
-    #except:
-    #print('Error.')
+    except:
+        print('Error.')
 
 
 main(sys.argv[1:])
