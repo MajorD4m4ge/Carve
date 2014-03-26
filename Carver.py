@@ -63,6 +63,7 @@ gifs = []
 jpgs = []
 pngs = []
 bmps = []
+MaximumBMPSize = 10000000
 # </editor-fold>
 
 
@@ -297,6 +298,8 @@ def SearchGIFs(volume):
                     while byte != b'\x3b\x00\x00\x00':
                         endofgif = False
                         sector = f.read(BytesPerSector)
+                        if sector == b'':
+                            break
                         counter += 512
                         slider = 0
                         if (sector[0:6] == b'GIF89a') or (
@@ -447,6 +450,8 @@ def SearchPNGs(volume):
                     while byte != b'\x49\x45\x4E\x44\xAE\x42\x60\x82':
                         endofpng = False
                         sector = f.read(BytesPerSector)
+                        if sector == b'':
+                            break
                         counter += 512
                         slider = 0
                         if (sector[0:6] == b'GIF89a') or (
@@ -564,6 +569,7 @@ def SearchBMPs(volume):
     global FirstDataSector
     global BMPData
     global bmps
+    global MaximumBMPSize
     endofbmp = False
     counter = 0
 
@@ -580,37 +586,49 @@ def SearchBMPs(volume):
 
             while sector != b'':
                 if struct.unpack(">H", sector[0:2])[0] == 0x424D:
-                    BMPFilesize = struct.unpack("<H", sector[2:4])[0]
+                    BMPFilesize = struct.unpack("<I", sector[2:6])[0]
                     if debug >= 2:
                         print('\tBMP Header found at offset: ' + str((BytesPerSector * FirstDataSector) + counter))
                         print('\tBMP Filesize: ' + str(BMPFilesize))
+                    if BMPFilesize >= MaximumBMPSize:
+                        if debug >= 2:
+                            print('\tBMP Filesize greater than Max (10MB): ' + str(BMPFilesize))
+                        sector = f.read(BytesPerSector)
+                        counter += BytesPerSector
+                        continue
+
                     BMPData.append(sector)
                     bytestoread = BMPFilesize - BytesPerSector
                     while True:
                         sector = f.read(BytesPerSector)
-                        counter += BytesPerSector
-                        if (sector[0:6] == b'GIF89a') or (
-                            struct.unpack(">H", sector[0:2])[0] == 0xFFD8) or (
-                            struct.unpack(">H", sector[0:2])[0] == 0x424D) or (struct.unpack(">Q", sector[0:8])[0] == 0x89504E470D0A1A0A):
-                            if debug >= 2:
-                                print('\tAlternate BMP header found at ' + str((BytesPerSector * FirstDataSector) + counter) + '. Setting flag for 2nd piece search.')
-                            endofbmp = False
+                        if sector == b'':
                             break
+                        counter += BytesPerSector
+                        # if (sector[0:6] == b'GIF89a') or (
+                        #     struct.unpack(">H", sector[0:2])[0] == 0xFFD8) or (
+                        #     struct.unpack(">H", sector[0:2])[0] == 0x424D) or (struct.unpack(">Q", sector[0:8])[0] == 0x89504E470D0A1A0A):
+                        #     if debug >= 2:
+                        #         print('\tAlternate BMP header found at ' + str((BytesPerSector * FirstDataSector) + counter) + '. Setting flag for 2nd piece search.')
+                        #     endofbmp = False
+                        #     break
+                        # else:
+                        if bytestoread > 512:
+                            BMPData.append(sector)
+                            bytestoread -= 512
                         else:
-                            if bytestoread > 512:
-                                BMPData.append(sector)
-                                bytestoread -= 512
-                            else:
-                                BMPData.append(sector[0:bytestoread])
-                                bytestoread -= bytestoread
-                                endofbmp = True
-                                if debug >= 2:
-                                    print('\tBMP Data: ' + str(BMPData))
-                                    print('\tBMP MD5 Hash: ' + Hasher(BMPData, 'md5'))
-                                if debug >= 3:
-                                    print('\tBytes left: ' + str(bytestoread))
-                                break
-                    bmps.append(BMPData)
+                            BMPData.append(sector[0:bytestoread])
+                            bytestoread -= bytestoread
+                            endofbmp = True
+                            bmps.append(BMPData)
+
+                            if debug >= 2:
+                                print('\tBMP MD5 Hash: ' + Hasher(BMPData, 'md5'))
+                            if debug >= 3:
+                                print('\tBMP Data: ' + str(BMPData))
+                                print('\tBytes left: ' + str(bytestoread))
+                            BMPData = []
+                            break
+
                 else:
                     sector = f.read(BytesPerSector)
                     counter += BytesPerSector
@@ -639,8 +657,8 @@ def SearchJPGs(volume):
     breaker = False
 
 
-    try:
-        if debug >= 1:
+    #try:
+    if debug >= 1:
             print('Entering SearchJPGs')
         if debug >= 2:
             print('\tVolume Passed in: ' + str(volume))
@@ -663,8 +681,11 @@ def SearchJPGs(volume):
                         if debug >= 4:
                             print('\tBytes not equal to JPG footer.')
                         sector = f.read(BytesPerSector)
+                        if sector == b'':
+                            break
                         counter += 512
                         slider = 0
+
                         if (sector[0:6] == b'GIF89a') or (struct.unpack(">H", sector[0:2])[0] == 0x424D) or (struct.unpack(">Q", sector[0:8])[0] == 0x89504E470D0A1A0A):
                             endofjpg = False
                             if debug >= 2:
@@ -765,13 +786,14 @@ def SearchJPGs(volume):
                     sector = f.read(BytesPerSector)
                     counter += 512
 
-    except:
-        error = 'Error: Cannot Find Valid Headers.'
-        status = False
-    finally:
-        if debug >= 2:
+                    #except:
+                    #error = 'Error: Cannot Find Valid Headers.'
+                    #status = False
+                    #finally:
+    if debug >= 2:
             print('\tTotal JPGs Found: ' + str(len(jpgs)))
-        return status, error
+            print(error)
+    return status, error
 
 
 def Hasher(data, hashtype):
@@ -793,14 +815,18 @@ def Writer(text):
     print('\t' + text)
 
 
-def Header():
+def Header(volume, outputpath):
     print('')
     print('+--------------------------------------------------------------------------+')
-    print('|FAT32 File Carving Utility.                                               |')
+    print('|File Carving Utility.                                                     |')
     print('+---------------------------------------------------------------------------')
     print('|Author: Tahir Khan - tkhan9@gmu.edu                                       |')
     print('+--------------------------------------------------------------------------+')
     print('  Date Run: ' + str(datetime.datetime.now()))
+    print('+--------------------------------------------------------------------------+')
+    print('  Input Volume: ' + str(volume))
+    print('+--------------------------------------------------------------------------+')
+    print('  Output Path:  ' + str(outputpath))
     print('+--------------------------------------------------------------------------+')
 
 
@@ -818,7 +844,8 @@ def FileHashes():
     global bmps
     global gifs
 
-    print('|MD5 Hashes:                                                               |')
+    print('+--------------------------------------------------------------------------+')
+    print('| MD5 Hashes:                                                              |')
     print('+--------------------------------------------------------------------------+')
     if pngs:
         for files in pngs:
@@ -836,32 +863,35 @@ def FileHashes():
     sys.exit(0)
 
 
-def Completed(outputpath):
+def Completed():
     print('| [*] Completed.                                                           |')
     print('+--------------------------------------------------------------------------+')
-    print(' Output Path: ' + str(outputpath))
-    print('+--------------------------------------------------------------------------+')
+    sys.exit(0)
 
 
 signal.signal(signal.SIGINT, signal_handler)
 
 
 def main(argv):
-    try:
-        global debug
-        #parse the command-line arguments
+    #try:
+    global debug
+    md5 = False
+    #parse the command-line arguments
         parser = argparse.ArgumentParser(description="A FAT32 file system carver.",
                                          add_help=True)
         parser.add_argument('-p', '--path', help='The path to write the files to.', required=True)
         parser.add_argument('-v', '--volume', help='The volume to read from.', required=True)
-        parser.add_argument('-d', '--debug', help='The level of debugging.', required=False)
+    parser.add_argument('-m', '--md5', help='Hash output files.', action='store_true', required=False)
+    parser.add_argument('-d', '--debug', help='The level of debugging.', required=False)
         parser.add_argument('--version', action='version', version='%(prog)s 1.5')
         args = parser.parse_args()
         if args.volume:
             volume = args.volume
         if args.path:
             path = args.path
-        if args.debug:
+    if args.md5:
+        md5 = True
+    if args.debug:
             debug = args.debug
             debug = int(debug)
         if _platform == "linux" or _platform == "linux2":
@@ -879,10 +909,8 @@ def main(argv):
             #    print ('Error: System not supported.')
             #    sys.exit(1)
 
-
-
-        Header()
-        status, error, bootsector = IdentifyFileSystem(volume)
+    Header(volume, path)
+    status, error, bootsector = IdentifyFileSystem(volume)
         if status:
             print('| [+] Identifying File System.                                             |')
         else:
@@ -924,11 +952,13 @@ def main(argv):
         else:
             print('| [-] Writing Output.                                                      |')
             Failed(error)
-        Completed(path)
+    if md5:
         FileHashes()
+    Completed()
 
-    except:
-        print('Error.')
+
+    #except:
+    #print('Error.')
 
 
 main(sys.argv[1:])
