@@ -304,11 +304,11 @@ def SearchGIFs(volume):
                     while byte != b'\x3b\x00\x00\x00':
                         endofgif = False
                         sector = f.read(BytesPerSector)
-                        counter += 512
+                        counter += BytesPerSector
                         if sector == b'':
                             break
-                        if sector == 512 * b'\x00':
-                            continue
+                        #if sector == 512 * b'\x00':
+                        #    continue
                         slider = 0
                         if (sector[0:6] == b'GIF89a') or sector[0:6] == b'GIF87a' or (
                             struct.unpack(">H", sector[0:2])[0] == 0xFFD8) or (
@@ -326,11 +326,11 @@ def SearchGIFs(volume):
                             byte = b'\x00'
                             #f.seek((BytesPerSector * FirstDataSector) + counter)
                             sector = f.read(BytesPerSector)
-                            counter += 512
+                            counter += BytesPerSector
                             while sector != b'':
                                 if debug >= 3:
                                     print('\tEntering Slider for GIF.')
-                                x = 512
+                                x = BytesPerSector
                                 if (struct.unpack(">Q", sector[0:8])[0] != 0x89504E470D0A1A0A) and (
                                             struct.unpack(">H", sector[0:2])[0] != 0xFFD8) and (
                                             struct.unpack(">H", sector[0:2])[0] != 0x424D) and (sector[0:6] != b'GIF89a') and (sector[0:6] != b'GIF87a'):
@@ -398,7 +398,7 @@ def SearchGIFs(volume):
                             GIFData = []
                             break
                         else:
-                            while slider != 512:
+                            while slider != BytesPerSector:
                                 if debug >= 3:
                                     print('\tSearching for GIF end.')
                                 byte = sector[slider:slider + 4]
@@ -423,7 +423,7 @@ def SearchGIFs(volume):
                         print('\tSector Data: ' + str(sector))
                     byte = b''
                     sector = f.read(BytesPerSector)
-                    counter += 512
+                    counter += BytesPerSector
     except:
         error = 'Error: Cannot Find Valid Headers.'
         status = False
@@ -467,11 +467,11 @@ def SearchPNGs(volume):
                     while byte != b'\x49\x45\x4E\x44\xAE\x42\x60\x82':
                         endofpng = False
                         sector = f.read(BytesPerSector)
-                        counter += 512
+                        counter += BytesPerSector
                         if sector == b'':
                             break
-                        if sector == 512 * b'\x00':
-                            continue
+                        #if sector == 512 * b'\x00':
+                        #    continue
                         slider = 0
                         if (sector[0:6] == b'GIF89a') or (sector[0:6] == b'GIF897a') or (
                             struct.unpack(">H", sector[0:2])[0] == 0xFFD8) or (
@@ -485,11 +485,11 @@ def SearchPNGs(volume):
                             byte = b'\x00'
                             #f.seek(BytesPerSector * FirstDataSector)
                             sector = f.read(BytesPerSector)
-                            counter += 512
+                            counter += BytesPerSector
                             while byte != b'':
                                 if debug >= 3:
                                     print('\tEntering Slider for PNG.')
-                                x = 512
+                                x = BytesPerSector
                                 if (struct.unpack(">Q", sector[0:8])[0] != 0x89504E470D0A1A0A) and (
                                             struct.unpack(">H", sector[0:2])[0] != 0xFFD8) and (
                                             struct.unpack(">H", sector[0:2])[0] != 0x424D) and (sector[0:6] != b'GIF89a') and (sector[0:6] != b'GIF87a'):
@@ -551,7 +551,7 @@ def SearchPNGs(volume):
                             PNGData = []
                             break
                         else:
-                            while slider != 512:
+                            while slider != BytesPerSector:
                                 if debug >= 3:
                                     print('\tSearching for PNG end.')
                                 byte = sector[slider:slider + 8]
@@ -577,7 +577,7 @@ def SearchPNGs(volume):
                         print('\tSector Data: ' + str(sector))
                     byte = b''
                     sector = f.read(BytesPerSector)
-                    counter += 512
+                    counter += BytesPerSector
     except:
         error = 'Error: Cannot Find Valid Headers.'
         status = False
@@ -635,9 +635,9 @@ def SearchBMPs(volume):
                         #     endofbmp = False
                         #     break
                         # else:
-                        if bytestoread > 512:
+                        if bytestoread > BytesPerSector:
                             BMPData.append(sector)
-                            bytestoread -= 512
+                            bytestoread -= BytesPerSector
                         else:
                             BMPData.append(sector[0:bytestoread])
                             bytestoread -= bytestoread
@@ -704,11 +704,11 @@ def SearchJPGs(volume):
                         if debug >= 4:
                             print('\tBytes not equal to JPG footer.')
                         sector = f.read(BytesPerSector)
-                        counter += 512
+                        counter += BytesPerSector
                         if sector == b'':
                             break
-                        if sector == 512 * b'\x00':
-                            continue
+                        #if sector == 512 * b'\x00':
+                        #    continue
                         slider = 0
                         if (sector[0:6] == b'GIF89a') or (sector[0:6] == b'GIF87a') or (struct.unpack(">H", sector[0:2])[0] == 0x424D) or (struct.unpack(">Q", sector[0:8])[0] == 0x89504E470D0A1A0A) or (struct.unpack(">H", sector[0:2])[0] == 0xFFD8):
                             endofjpg = False
@@ -721,7 +721,7 @@ def SearchJPGs(volume):
                             byte = b'\x00'
                             #f.seek(BytesPerSector * FirstDataSector)  #seeking to root data again to start looking for end of JPG
                             sector = f.read(BytesPerSector)
-                            counter += 512
+                            counter += BytesPerSector
                             while sector != b'':
                                 if debug >= 3:
                                     print('\tEntering Slider for JPG.')
@@ -793,7 +793,7 @@ def SearchJPGs(volume):
                             JPGData = []
                             break
                         else:
-                            while slider != 512:
+                            while slider != BytesPerSector:
                                 if debug >= 3:
                                     print('\tSearching for JPG end.')
                                 byte = sector[slider:slider + 6]
@@ -818,7 +818,7 @@ def SearchJPGs(volume):
                         print('\tSector Data: ' + str(sector))
                     byte = b''
                     sector = f.read(BytesPerSector)
-                    counter += 512
+                    counter += BytesPerSector
 
                     #except:
                     #error = 'Error: Cannot Find Valid Headers.'
