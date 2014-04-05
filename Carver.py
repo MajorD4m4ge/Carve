@@ -11,6 +11,7 @@ import datetime
 import signal
 import struct
 import hashlib
+import os.path
 from sys import platform as _platform
 
 debug = 0
@@ -923,23 +924,29 @@ def main(argv):
         args = parser.parse_args()
         if args.input:
             volume = args.input
+            if not os.path.isfile(volume):
+                print('File/Volume --> ' + str(volume) + ' does not exist.')
+                sys.exit(1)
         if args.output:
             output = args.output
+            if not os.path.isdir(output):
+                print('Directory --> ' + str(output) + ' does not exist.')
+                sys.exit(1)
         if args.verify:
             verify = True
         if args.debug:
             debug = args.debug
             debug = int(debug)
         if _platform == "linux" or _platform == "linux2":
-            os = 'Linux'
+            opersys = 'Linux'
         elif _platform == "darwin":
-            os = 'Mac'
+            opersys = 'Mac'
         elif _platform == "win32":
-            os = 'Windows'
+            opersys = 'Windows'
         if debug >= 1:
             print('Entered main:')
             print('\tVolume: ' + str(volume))
-            print('\tOperating System: ' + str(os))
+            print('\tOperating System: ' + str(opersys))
             print('\tDebug Level: ' + str(debug))
             #if (os == 'Windows'):
             #    print ('Error: System not supported.')
