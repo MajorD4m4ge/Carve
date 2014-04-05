@@ -65,6 +65,11 @@ jpgs = []
 pngs = []
 bmps = []
 MaximumBMPSize = 10000000
+MaximumJPGSize = 10000000
+MaximumGIFSize = 10000000
+MaximumPNGPSize = 10000000
+usedsectors = []
+
 # </editor-fold>
 
 
@@ -301,6 +306,8 @@ def SearchGIFs(volume):
                         sector = f.read(BytesPerSector)
                         if sector == b'':
                             break
+                        if sector == 512 * b'\x00':
+                            continue
                         counter += 512
                         slider = 0
                         if (sector[0:6] == b'GIF89a') or sector[0:6] == b'GIF87a' or (
@@ -313,12 +320,14 @@ def SearchGIFs(volume):
                                 print('\tMD5 Hash of First Chunk: ' + str(Hasher(data, 'md5')))
                             if debug >= 2:
                                 print('\tSearching backwards for GIF End.')
-                            counter = 0
+                            #counter = 0
+
                             breaker = False
                             byte = b'\x00'
-                            f.seek(BytesPerSector * FirstDataSector)
+                            #f.seek((BytesPerSector * FirstDataSector) + counter)
                             sector = f.read(BytesPerSector)
-                            while byte != '':
+                            counter += 512
+                            while sector != b'':
                                 if debug >= 3:
                                     print('\tEntering Slider for GIF.')
                                 x = 512
@@ -328,9 +337,9 @@ def SearchGIFs(volume):
                                     while x != 0:
                                         if debug >= 3:
                                             print('\tSearching for GIF Footer.')
-                                        if byte[BytesPerSector - 1:BytesPerSector] == b'\x00':
-                                            firstchars = byte[x - 2:x]
-                                            if firstchars ==  b'\x3b\x00':
+                                        if sector[BytesPerSector - 1:BytesPerSector] == b'\x00':
+                                            firstchars = sector[x - 2:x]
+                                            if firstchars == b'\x3b\x00':
                                                 if debug >= 2:
                                                     print('\tGIF Footer found.')
                                                 GIFFootEnd = (BytesPerSector * FirstDataSector + counter + x - 1)
@@ -349,12 +358,18 @@ def SearchGIFs(volume):
                                     if breaker:
                                         break
                                     counter += BytesPerSector
-                                    byte = f.read(BytesPerSector)
+                                    sector = f.read(BytesPerSector)
+                                    if sector == b'':
+                                        break
                                     if debug >= 3:
                                         print('\tNext sector: ' + str(BytesPerSector * FirstDataSector + counter))
                                 else:
                                     counter += BytesPerSector
-                                    byte = f.read(BytesPerSector)
+                                    sector = f.read(BytesPerSector)
+                                    if sector == b'':
+                                        break
+                                    if debug >= 3:
+                                        print('\tNext sector: ' + str(BytesPerSector * FirstDataSector + counter))
                             while True:
                                 f.seek(GIFFootEnd - offsetfromsector - backwards - 16)
                                 byte = f.read(16)
@@ -805,7 +820,6 @@ def SearchJPGs(volume):
         return status, error
 
 
-
 def Hasher(data, hashtype):
     ba = b''
     for x in data:
@@ -875,14 +889,13 @@ def FileHashes():
 def Completed():
     print('| [*] Completed.                                                           |')
     print('+--------------------------------------------------------------------------+')
-    sys.exit(0)
 
 
 signal.signal(signal.SIGINT, signal_handler)
 
 
 def main(argv):
-    try:
+    #try:
         global debug
         md5 = False
         #parse the command-line arguments
@@ -965,8 +978,8 @@ def main(argv):
         Completed()
 
 
-    except:
-        sys.exit(0)
+    #except:
+        #sys.exit(1)
 
 
 main(sys.argv[1:])
