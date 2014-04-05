@@ -563,9 +563,10 @@ def SearchPNGs(volume):
                                             (BytesPerSector * FirstDataSector) + counter + slider) + ' : ' + str(byte))
                                     data.append(sector[0:slider + 8])
                                     pngs.append(data)
+                                    if debug >= 2:
+                                        print('\tPNG MD5 Hash: ' + str(Hasher(data, 'md5'))) #0e63e6cc0426d87fd30d597a0a572a27
                                     if debug >= 3:
                                         print('\tPNG Data [Length]: ' + '[' + str(len(data)) + '] ' + str(data))   #0e63e6cc0426d87fd30d597a0a572a27
-                                        print('\tPNG MD5 Hash: ' + str(Hasher(data, 'md5'))) #0e63e6cc0426d87fd30d597a0a572a27
                                     endofpng = True
                                     data = []
                                     break
@@ -914,6 +915,7 @@ def main(argv):
     try:
         global debug
         verify = False
+        opersys = ''
         #parse the command-line arguments
         parser = argparse.ArgumentParser(description="A File system carver.", add_help=True)
         parser.add_argument('-o', '--output', help='The output path to write the files to.', required=True)
@@ -925,12 +927,14 @@ def main(argv):
         if args.input:
             volume = args.input
             if not os.path.isfile(volume):
-                print('File/Volume --> ' + str(volume) + ' does not exist.')
+                print('')
+                print('Error: File/Volume --> ' + str(volume) + ' does not exist.')
                 sys.exit(1)
         if args.output:
             output = args.output
             if not os.path.isdir(output):
-                print('Directory --> ' + str(output) + ' does not exist.')
+                print('')
+                print('Error: Directory --> ' + str(output) + ' does not exist.')
                 sys.exit(1)
         if args.verify:
             verify = True
