@@ -64,6 +64,7 @@ gifs = []
 jpgs = []
 pngs = []
 bmps = []
+maximum = 10000000
 MaximumBMPSize = 10000000
 MaximumJPGSize = 10000000
 MaximumGIFSize = 10000000
@@ -382,7 +383,7 @@ def SearchGIFs(volume):
                                     break
                             f.seek(GIFFootStart)
                             if debug >= 2:
-                                print('\tSeeking to First Data Sector [Bytes]: ' + str(GIFFootStart))
+                                print('\tSeeking to Data Sector [Bytes]: ' + str(GIFFootStart))
 
                             GIFFootChunk.append(f.read(GIFFootEnd - GIFFootStart))
                             GIFData = data + GIFFootChunk
@@ -537,7 +538,7 @@ def SearchPNGs(volume):
                                     break
                             f.seek(PNGFootStart)
                             if debug >= 2:
-                                print('\tSeeking to First Data Sector [Bytes]: ' + str(PNGFootStart))
+                                print('\tSeeking to Data Sector [Bytes]: ' + str(PNGFootStart))
                             PNGFootChunk.append(f.read(PNGFootEnd + 1 - PNGFootStart))
                             PNGData = data + PNGFootChunk
                             pngs.append(PNGData)
@@ -777,7 +778,7 @@ def SearchJPGs(volume):
                                     break
                             f.seek(JPGFootStart)
                             if debug >= 2:
-                                print('\tSeeking to First Data Sector [Bytes]: ' + str(JPGFootStart))
+                                print('\tSeeking to Data Sector [Bytes]: ' + str(JPGFootStart))
 
                             JPGFootChunk.append(f.read(JPGFootEnd + 1 - JPGFootStart))
                             JPGData = data + JPGFootChunk
@@ -909,23 +910,23 @@ signal.signal(signal.SIGINT, signal_handler)
 
 
 def main(argv):
-    #try:
+    try:
         global debug
-        md5 = False
+        verify = False
         #parse the command-line arguments
-        parser = argparse.ArgumentParser(description="A FAT32 file system carver.", add_help=True)
-        parser.add_argument('-p', '--path', help='The path to write the files to.', required=True)
-        parser.add_argument('-v', '--volume', help='The volume to read from.', required=True)
-        parser.add_argument('-m', '--md5', help='Hash output files.', action='store_true', required=False)
+        parser = argparse.ArgumentParser(description="A File system carver.", add_help=True)
+        parser.add_argument('-o', '--output', help='The output path to write the files to.', required=True)
+        parser.add_argument('-i', '--input', help='The volume to read from.', required=True)
+        parser.add_argument('-v', '--verify', help='MD5 hash output files.', action='store_true', required=False)
         parser.add_argument('-d', '--debug', help='The level of debugging.', required=False)
         parser.add_argument('--version', action='version', version='%(prog)s 1.5')
         args = parser.parse_args()
-        if args.volume:
-            volume = args.volume
-        if args.path:
-            path = args.path
-        if args.md5:
-            md5 = True
+        if args.input:
+            volume = args.input
+        if args.output:
+            output = args.output
+        if args.verify:
+            verify = True
         if args.debug:
             debug = args.debug
             debug = int(debug)
@@ -944,7 +945,7 @@ def main(argv):
             #    print ('Error: System not supported.')
             #    sys.exit(1)
 
-        Header(volume, path)
+        Header(volume, output)
         status, error, bootsector = IdentifyFileSystem(volume)
         if status:
             print('| [+] Identifying File System.                                             |')
@@ -981,19 +982,19 @@ def main(argv):
         else:
             print('| [-] Searching for BMP Data.                                              |')
             Failed(error)
-        status, error = WriteDatatoFile(path)
+        status, error = WriteDatatoFile(output)
         if status:
             print('| [+] Writing Output.                                                      |')
         else:
             print('| [-] Writing Output.                                                      |')
             Failed(error)
-        if md5:
+        if verify:
             FileHashes()
         Completed()
 
 
-    #except:
-        #sys.exit(1)
+    except:
+        sys.exit(1)
 
 
 main(sys.argv[1:])
